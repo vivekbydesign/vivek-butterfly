@@ -22,7 +22,7 @@ const PAPERS = {
   gold:    { base: '#f5a514', wash: ['#ffc030', '#e88610', '#f9cf48'], tones: ['#ee9a14', '#ffc23a'], streak: ['#d85a10', '#ffe880', '#c8301a'] },
   orange:  { base: '#ef7016', wash: ['#f79226', '#dc4e10', '#ffaa30'], tones: ['#e8641a', '#f88a28'], streak: ['#ffd040', '#b8380e', '#e02a5a', '#ffe680'] },
   red:     { base: '#d92a1c', wash: ['#ec4a24', '#b0141a', '#f06a2c', '#c01e1e'], tones: ['#c82018', '#e84024'], streak: ['#8a0e14', '#f88a40', '#d02a7a', '#ffc23a'] },
-  berry:   { base: '#bb4a2e', wash: ['#c8502e', '#a0381f', '#d0603a', '#8a3020'], tones: ['#a83a24', '#cf5a34', '#8c2c1c', '#d8704a'], streak: ['#6a2014', '#e08a5a'] },
+  berry:   { base: '#d2321f', wash: ['#e04a2a', '#b0201a', '#e8603a', '#a01a1a'], tones: ['#c42a1c', '#e0482a', '#a81e16', '#ea6a3a'], streak: ['#6a2014', '#e08a5a'] },
   magenta: { base: '#cf2f84', wash: ['#e45aa2', '#a62068', '#d84090'], tones: ['#b82576', '#e868a8'], streak: ['#6a2290', '#ffb0d6', '#f05a2a', '#2a3ab0'] },
   blue:    { base: '#2050bc', wash: ['#3878de', '#14398f', '#2a62d0'], tones: ['#1a46a8', '#3a74d8'], streak: ['#0b2a66', '#8cc0f0', '#2ab0c0', '#7a3ac0'] },
   plum:    { base: '#2a3fae', wash: ['#1a2a8a', '#3a5ad0', '#25307a', '#4a3a9a'], tones: ['#203aa0', '#3a5ac8', '#18287a'], streak: ['#6a8af0', '#0f1a50'], patch: ['#5a3a9a'] },
@@ -63,7 +63,7 @@ function tissueTile(key) {
     seed = s1;
   };
   const band = (sw, col, alpha, lMin, lMax) => {
-    const cx = rr(0, T), cy = rr(0, T), a = rr(-0.3, 0.3), len = rr(lMin, lMax), dx = (Math.cos(a) * len) / 2, dy = (Math.sin(a) * len) / 2, bend = rr(-0.15, 0.15) * len;
+    const cx = rr(0, T), cy = rr(0, T), a = rr(-0.3, 0.3), len = rr(lMin, lMax), dx = (Math.cos(a) * len) / 2, dy = (Math.sin(a) * len) / 2, bend = (R() < 0.25 ? rr(-0.45, 0.45) : rr(-0.12, 0.12)) * len;
     wrap(cx, cy, len / 2 + sw, () => hairs(g, cx - dx, cy - dy, cx - Math.sin(a) * bend, cy + Math.cos(a) * bend, cx + dx, cy + dy, sw, col, alpha, 1));
   };
   g.fillStyle = P.base; g.fillRect(0, 0, T, T);
@@ -88,14 +88,21 @@ function tissueTile(key) {
     const cx = rr(0, T), cy = rr(0, T), len = rr(90, 240), n = 5 + Math.floor(R() * 5), sp = rr(4, 7), col = pick(P.streak.concat(P.wash)), ph = rr(0, TAU), amp = rr(2, 9), al = rr(0.3, 0.55);
     wrap(cx, cy, len / 2 + n * sp, () => { g.strokeStyle = col; g.lineWidth = rr(1, 2); g.globalAlpha = al; g.lineCap = 'round'; for (let j = 0; j < n; j++) { g.beginPath(); for (let t = 0; t <= len; t += 6) { const px = cx - len / 2 + t, py = cy + j * sp + Math.sin(t / 30 + ph) * amp; t ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); } });
   }
+  // scraped highlights: a lighter mix of the base dragged across with a dry brush
+  const lite = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - k) + 255 * k).toString(16).padStart(2, '0')).join('');
+  for (let i = 0; i < 10; i++) band(rr(10, 26), lite(P.base, rr(0.2, 0.4)), rr(0.2, 0.4), 120, 360);
+  for (let i = 0; i < 10; i++) band(rr(10, 26), pick(P.tones), rr(0.5, 0.8), 100, 260);
   for (let k = 0; k < 4; k++) {
     const cx = rr(0, T), cy = rr(0, T), r = rr(25, 60), col = pick(P.wash.concat(P.streak));
     wrap(cx, cy, r, () => { g.fillStyle = col; for (let j = 0; j < 70; j++) { const a = rr(0, TAU), d = r * Math.sqrt(R()); g.globalAlpha = rr(0.25, 0.6); g.beginPath(); g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, rr(0.8, 2.6), 0, TAU); g.fill(); } });
   }
   for (let i = 0; i < 150; i++) { const cx = rr(0, T), cy = rr(0, T), r = R() < 0.08 ? rr(3, 6) : rr(0.6, 2.4), col = pick(P.streak.concat(P.wash)), al = rr(0.5, 0.9); wrap(cx, cy, r, () => { g.globalAlpha = al; g.fillStyle = col; g.beginPath(); g.ellipse(cx, cy, r, r * rr(0.6, 1), rr(0, TAU), 0, TAU); g.fill(); }); }
   g.globalAlpha = 1;
-  const im = g.getImageData(0, 0, T, T), d = im.data, fib = new Float32Array(T).map(() => rr(-6, 6));
-  for (let p = 0, i = 0; p < d.length; p += 4, i++) { const n = rr(-9, 9) + fib[i % T]; d[p] += n; d[p + 1] += n; d[p + 2] += n; }
+  g.filter = 'blur(22px)';
+  for (let i = 0; i < 30; i++) { const cx = rr(0, T), cy = rr(0, T), r = rr(40, 120), col = R() < 0.5 ? '#000' : '#fff', al = rr(0.04, 0.09); wrap(cx, cy, r + 40, () => { g.globalAlpha = al; g.fillStyle = col; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); }); }
+  g.filter = 'none'; g.globalAlpha = 1;
+  const im = g.getImageData(0, 0, T, T), d = im.data;
+  for (let p = 0; p < d.length; p += 4) { const n = rr(-5, 5); d[p] += n; d[p + 1] += n; d[p + 2] += n; }
   g.putImageData(im, 0, 0);
   seed = keep;
   return c;
@@ -155,8 +162,8 @@ const PAT = {
   dots: (cols, s) => (g, [x, y, w, h], u) => { const st = s * u; let row = 0; for (let yy = y; yy < y + h + st; yy += st * 0.85, row++) for (let xx = x + (row % 2) * st * 0.5; xx < x + w + st; xx += st) { g.fillStyle = pick(cols); g.globalAlpha = rr(0.8, 1); g.beginPath(); g.ellipse(xx + rr(-0.25, 0.25) * st, yy + rr(-0.25, 0.25) * st, st * rr(0.18, 0.34), st * rr(0.15, 0.3), rr(0, TAU), 0, TAU); g.fill(); } g.globalAlpha = 1; },
   grain: (cols, s) => (g, [x, y, w, h], u) => { const st = s * u; g.lineCap = 'round'; for (let xx = x - st; xx < x + w + st; xx += st * rr(0.5, 1.2)) { g.strokeStyle = pick(cols); g.lineWidth = st * rr(0.1, 0.4); g.globalAlpha = rr(0.75, 1); const ph = rr(0, TAU), amp = st * rr(0.1, 0.35), fr = rr(0.5, 1.4) / st; g.beginPath(); for (let yy = y; yy <= y + h; yy += 4 * u) { const xv = xx + Math.sin(yy * fr + ph) * amp; yy === y ? g.moveTo(xv, yy) : g.lineTo(xv, yy); } g.stroke(); if (R() < 0.5) { g.lineWidth = st * 0.1; g.beginPath(); g.arc(xx + st * 0.3, rr(y, y + h), st * rr(0.15, 0.3), rr(0, 3), rr(3.5, 6.5)); g.stroke(); } } g.globalAlpha = 1; },
   blooms: (cols, s) => (g, [x, y, w, h], u) => { const st = s * u, n = Math.round(((w * h) / (st * st)) * 2.2); for (let i = 0; i < n; i++) { const cx = rr(x, x + w), cy = rr(y, y + h), r = st * rr(0.1, 0.18), col = pick(cols); g.globalAlpha = rr(0.85, 1); if (R() < 0.55) { g.fillStyle = col; for (let p = 0; p < 5; p++) { const a = (p / 5) * TAU; g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, r * 0.75, 0, TAU); g.fill(); } g.fillStyle = pick(cols); g.beginPath(); g.arc(cx, cy, r * 0.55, 0, TAU); g.fill(); } else { g.fillStyle = col; g.beginPath(); g.arc(cx, cy, r * 0.5, 0, TAU); g.fill(); } } g.globalAlpha = 1; },
-  scribble: (cols, s) => (g, [x, y, w, h], u) => { const st = s * u, n = Math.round(((w * h) / (st * st)) * 0.6); g.lineCap = g.lineJoin = 'round'; for (let i = 0; i < n; i++) { let px = rr(x, x + w), py = rr(y, y + h), a = rr(0, TAU); g.strokeStyle = pick(cols); g.lineWidth = rr(0.7, 1.5) * u; g.globalAlpha = rr(0.4, 0.8); g.beginPath(); g.moveTo(px, py); for (let k = 0; k < 14; k++) { a += rr(-1.4, 1.4); px += Math.cos(a) * st * 0.25; py += Math.sin(a) * st * 0.25; g.lineTo(px, py); } g.stroke(); } g.globalAlpha = 1; },
-  dashes: (cols, s) => (g, [x, y, w, h], u) => { const st = s * u, n = Math.round(((w * h) / (st * st)) * 2.4); g.lineCap = 'round'; for (let i = 0; i < n; i++) { const cx = rr(x, x + w), cy = rr(y, y + h), a = -0.7 + rr(-0.35, 0.35), L = st * rr(0.35, 0.7); g.strokeStyle = pick(cols); g.lineWidth = st * rr(0.14, 0.24); g.globalAlpha = rr(0.8, 1); g.beginPath(); g.moveTo(cx - (Math.cos(a) * L) / 2, cy - (Math.sin(a) * L) / 2); g.lineTo(cx + (Math.cos(a) * L) / 2, cy + (Math.sin(a) * L) / 2); g.stroke(); } g.globalAlpha = 1; },
+  scribble: (cols, s) => (g, [x, y, w, h], u) => { const st = s * u, n = Math.round(((w * h) / (st * st)) * 0.35); g.lineCap = g.lineJoin = 'round'; for (let i = 0; i < n; i++) { let px = rr(x, x + w), py = rr(y, y + h), a = rr(0, TAU); g.strokeStyle = pick(cols); g.lineWidth = rr(2.5, 5) * u; g.globalAlpha = rr(0.55, 0.9); g.beginPath(); g.moveTo(px, py); for (let k = 0; k < 14; k++) { a += rr(-0.5, 0.5); px += Math.cos(a) * st * 0.25; py += Math.sin(a) * st * 0.25; g.lineTo(px, py); } g.stroke(); } g.globalAlpha = 1; },
+  dashes: (cols, s) => (g, [x, y, w, h], u) => { const st = s * u, n = Math.round(((w * h) / (st * st)) * 2.4); g.lineCap = 'round'; for (let i = 0; i < n; i++) { const cx = rr(x, x + w), cy = rr(y, y + h), a = -0.7 + rr(-0.35, 0.35), L = st * rr(0.35, 0.7); const dx = (Math.cos(a) * L) / 2, dy = (Math.sin(a) * L) / 2; hairs(g, cx - dx, cy - dy, cx, cy, cx + dx, cy + dy, st * rr(0.2, 0.32), pick(cols), rr(0.75, 1), u); } g.setLineDash([]); g.globalAlpha = 1; },
 };
 
 const LETTERS = [
