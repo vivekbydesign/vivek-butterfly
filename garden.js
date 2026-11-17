@@ -327,7 +327,7 @@ export function makeGarden(w, h, opts = {}) {
   return { back, sprites, tissue };
 }
 
-// Caterpillar: local-only art (public/local, gitignored) from the rishi-caterpillar project.
+// Caterpillar art shared by localhost and the hosted garden.
 export function loadCaterpillar() {
   const load = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; artSrc(src).then((s) => { i.src = s; }); });
   return Promise.all([load('cat_head.png'), load('segments.jpg')]).then(([head, seg]) => ({ head, seg })).catch(() => null);
@@ -344,11 +344,18 @@ function caterpillarSprite({ head, seg }, w, h) {
     g.drawImage(seg, i * 52 + 1, 1, 50, 50, -ry * 1.2, -ry * 1.2, ry * 2.4, ry * 2.4); g.restore();
     segs.push(c);
   }
-  const hs = (R * 1.3 * 1.25) / 66, gap = R * 1.2, len = gap * n + R * 2;
+  const hs = (R * 1.3 * 1.25) / 66, gap = R * 1.2;
+  const margin = Math.min(w / 2, gap * n / 2 + R * 1.6), distance = w - margin * 2;
+  const travelTime = Math.max(1, distance / (w * 0.012)), turnTime = 0.9, legTime = travelTime + turnTime;
   const foot = (g, x, y) => { g.fillStyle = '#7a3f8f'; g.beginPath(); g.ellipse(x, y, R * 0.13, R * 0.24, 0, 0, TAU); g.fill(); };
   return {
     draw(g, t) {
-      const speed = w * 0.012, span = w + len * 2, hx = ((t * speed + w * 0.62) % span) - len, base = h * 0.925;
+      const phase = (t + travelTime * 0.45) % (legTime * 2), returning = phase >= legTime;
+      const leg = phase % legTime, progress = Math.min(1, leg / travelTime);
+      const cx = margin + distance * (returning ? 1 - progress : progress);
+      const facing = (returning ? -1 : 1) * Math.cos(Math.max(0, leg - travelTime) / turnTime * Math.PI);
+      const hx = gap * n / 2, base = h * 0.925;
+      g.save(); g.translate(cx, 0); g.scale(facing, 1);
       for (let i = n - 1; i >= 0; i--) {
         const x = hx - (i + 1) * gap, k = Math.max(0, Math.sin(t * 2.4 - i * 0.55));
         const y = base - R - k * k * R * 0.55;
@@ -357,6 +364,7 @@ function caterpillarSprite({ head, seg }, w, h) {
       }
       const hy = base - R * 1.3 - Math.max(0, Math.sin(t * 2.4 + 0.55)) * R * 0.25;
       g.save(); g.translate(hx, hy); g.rotate(Math.sin(t * 1.2) * 0.05); g.scale(hs, hs); g.drawImage(head, -44, -142); g.restore();
+      g.restore();
     },
   };
 }
