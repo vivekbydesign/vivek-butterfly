@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rishi's Garden</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #fdfcf9; overflow: hidden; cursor: none; font-family: -apple-system, "SF Pro Display", "Segoe UI", sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .qr { position: fixed; right: 3vw; bottom: 4vh; display: flex; align-items: center; gap: 18px; padding: 14px 20px 14px 14px; border-radius: 20px; background: rgba(255,251,242,.92); border: 0; color: #2b2118; transition: opacity .6s; box-shadow: 2px 4px 14px rgba(60,40,20,.25); }
+  .qr img { width: 112px; height: 112px; border-radius: 10px; background: #fff; padding: 6px; box-sizing: border-box; }
+  .qr b { display: block; font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .qr span { font-size: 14px; color: #6b5a48; line-height: 1.4; }
+  .qr.off { opacity: 0; }
+  .caption { position: fixed; left: 50%; top: 79%; transform: translate(-50%, 10px); color: #fff; -webkit-text-stroke: 0; font-weight: 700; font-size: clamp(22px, 2.6vw, 44px); font-weight: 500; letter-spacing: .01em; opacity: 0; transition: opacity 1s, transform 1s; text-shadow: 0 2px 0 rgba(40,25,10,.35), 0 0 24px rgba(40,25,10,.35); pointer-events: none; white-space: nowrap; }
+  .caption.on { opacity: 1; transform: translate(-50%, 0); }
+  .menu-btn { position: fixed; top: 18px; right: 18px; width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(255,190,225,.4); background: rgba(30,18,32,.85); color: #fff; font-size: 26px; font-weight: 700; line-height: 1; cursor: pointer; backdrop-filter: blur(10px); opacity: .8; transition: opacity .3s; z-index: 1000; display: grid; place-items: center; padding: 0 0 8px; }
+  .menu-btn:hover, .menu-btn[aria-expanded="true"] { opacity: 1; }
+  .menu { position: fixed; top: 66px; right: 18px; min-width: 240px; padding: 8px; border-radius: 16px; background: rgba(16,10,18,.9); border: 1px solid rgba(255,190,225,.18); backdrop-filter: blur(14px); color: #f7eaf2; font-size: 14px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .menu[hidden] { display: none; }
+  .menu label { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+  .menu label:hover { background: rgba(255,255,255,.06); }
+  .menu kbd { font: 11px ui-monospace, monospace; color: #a8909f; margin-left: 6px; }
+  .menu input { appearance: none; width: 36px; height: 20px; border-radius: 10px; background: rgba(255,255,255,.18); position: relative; cursor: pointer; transition: background .2s; flex: none; margin: 0; }
+  .menu input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .menu input:checked { background: #e86aa8; }
+  .menu input:checked::after { transform: translateX(16px); }
+  .menu-action { display: flex; justify-content: space-between; width: 100%; margin-top: 4px; padding: 10px 12px; border: 0; border-top: 1px solid rgba(255,255,255,.08); border-radius: 0 0 10px 10px; background: none; color: #ff9cc8; font: inherit; text-align: left; cursor: pointer; }
+  .menu-action:hover { background: rgba(255,120,180,.1); }
+  body.show-cursor { cursor: default; }
+  .hint { position: fixed; left: 16px; bottom: 12px; color: rgba(255,255,255,.25); font-size: 12px; transition: opacity 1s; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="caption" id="caption"></div>
+<div class="qr" id="qr">
+  <img id="qrimg" alt="">
+  <div><b>Release your butterfly</b><span>Colour one in, then scan<br>to bring it to life here.</span></div>
+</div>
+<button class="menu-btn" id="menuBtn" aria-label="Settings" aria-expanded="false">⋯</button>
+<div class="menu" id="menu" hidden>
+  <label>Webcam silhouette<kbd>C</kbd><input type="checkbox" id="optCam"></label>
+  <label>Ambient butterflies<kbd>A</kbd><input type="checkbox" id="optAmbient"></label>
+  <label>QR code<kbd>Q</kbd><input type="checkbox" id="optQr"></label>
+  <button class="menu-action" id="loadArt" style="color:#f7eaf2;border-radius:0">Load garden art…<kbd>local folder</kbd></button>
+  <input type="file" id="artDir" webkitdirectory multiple hidden>
+  <button class="menu-action" id="clearAll">Clear butterflies<kbd>R</kbd></button>
+</div>
+<div class="hint" id="hint">⋯ or M settings · F fullscreen · Q QR · A ambient butterflies · C webcam · T test arrival · V camera preview · R clear butterflies</div>
+<video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
+<script type="module">
+  import { BodyTracker } from './body.js';
+  import { STATIC, qrSrc, listButterflies, clearButterflies, listen, uploadUrl } from './net.js';
+  qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
+  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js';
+  let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
+  loadTextures().then((n) => { if (n) gardenKey = ''; });
+  import('./art.js').then(({ importArt }) => {
+    const dir = document.getElementById('artDir');
+    document.getElementById('loadArt').onclick = () => dir.click();
+    dir.onchange = async () => {
+      const n = await importArt(dir.files); dir.value = '';
+      loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
+      loadTextures().then(() => { gardenKey = ''; });
+      console.log('Garden art loaded:', n, 'files');
+    };
+  });
+
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+  const resize = () => { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; };
+  addEventListener('resize', resize); resize();
+
+  // World: x ∈ ~[-800, 800], y ∈ ~[-450, 450] at z = 0; z grows away from viewer.
+  const F = 1100;
+  const project = (x, y, z) => { const s = F / (F + z), k = W / 1600; return [W / 2 + x * s * k, H / 2 + y * s * k, s * k]; };
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = (t) => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
+
+  function makeSprite({ canvas, cx }) {
+    const h = canvas.height, lw = Math.max(1, Math.round(cx)), rw = Math.max(1, canvas.width - lw);
+    const L = document.createElement('canvas'); L.width = lw; L.height = h; L.getContext('2d').drawImage(canvas, 0, 0);
+    const R = document.createElement('canvas'); R.width = rw; R.height = h; R.getContext('2d').drawImage(canvas, -lw, 0);
+    const norm = 120 / Math.max(canvas.width, h * 1.33);
+    // Pre-shrunk copies so small butterflies stay smooth instead of shimmering.
+    const mips = [{ L, R, w: lw }];
+    while (mips[mips.length - 1].w > 48) {
+      const prev = mips[mips.length - 1], half = (c) => { const n = document.createElement('canvas'); n.width = Math.max(1, c.width >> 1); n.height = Math.max(1, c.height >> 1); const g = n.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, n.width, n.height); return n; };
+      mips.push({ L: half(prev.L), R: half(prev.R), w: prev.w >> 1 });
+    }
+    return { L, R, mips, lw: lw * norm, rw: rw * norm, h: h * norm };
+  }
+
+  const flock = [];
+  const MAX_AMBIENT = 45;
+  let t0 = performance.now() / 1000;
+
+  function spawn(sprite, opts = {}) {
+    const R = rand(220, 820);
+    const b = {
+      sprite, x: rand(-900, 900), y: rand(-500, 500), z: rand(-200, 1400), vx: 0, vy: 0, vz: 0,
+      orbitR: R, orbitE: rand(0.35, 0.6), orbitW: rand(0.05, 0.12) * (Math.random() < 0.85 ? 1 : -1), orbitP: rand(0, Math.PI * 2),
+      yOff: rand(-260, 260), zOff: rand(0, 900), flap: rand(0, 10), flapSpeed: rand(7, 11), size: rand(0.7, 1.25),
+      roll: 0, wob: rand(0, 10), ...opts,
+    };
+    flock.push(b);
+    return b;
+  }
+
+  // Ambient (non-photographed) swarm, off by default.
+  const settings = Object.assign({ cam: true, ambient: false, qr: true }, JSON.parse(localStorage.getItem('bw-settings') || '{}'));
+  const saveSettings = () => localStorage.setItem('bw-settings', JSON.stringify(settings));
+  function setAmbient(on) {
+    settings.ambient = on; saveSettings();
+    if (on) { const n = MAX_AMBIENT - flock.filter((b) => !b.ambient).length; for (let i = 0; i < Math.max(15, n); i++) spawn(makeSprite(collageButterfly(2, Math.random())), { ambient: true, z: rand(1400, 2200) }); }
+    else for (let i = flock.length - 1; i >= 0; i--) if (flock[i].ambient && flock[i] !== hero) { if (flock[i].perch) takeOff(flock[i]); flock.splice(i, 1); }
+  }
+
+  const loadImage = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  async function spriteFromUrl(url) {
+    const img = await loadImage(url);
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data; let sx = 0, n = 0;
+    for (let i = 3, p = 0; i < d.length; i += 4, p++) if (d[i] > 128) { sx += p % c.width; n++; }
+    return makeSprite({ canvas: c, cx: n ? sx / n : c.width / 2 });
+  }
+
+  // Uploaded butterflies: existing ones join quietly, new ones get an entrance.
+  const queue = [];
+  let hero = null;
+  listButterflies().then(async (list) => {
+    for (const item of list.slice(-120)) {
+      try { addUploaded(await spriteFromUrl(item.url), item, false); } catch {}
+    }
+  });
+  listen(async (item) => { try { queue.push({ sprite: await spriteFromUrl(item.url), item }); } catch {} }, onReset);
+  function onReset() { flock.forEach((b) => !b.ambient && takeOff(b)); for (let i = flock.length - 1; i >= 0; i--) if (!flock[i].ambient) flock.splice(i, 1); }
+
+  function addUploaded(sprite, item, entrance) {
+    const ambient = flock.filter((b) => b.ambient && b !== hero);
+    if (ambient.length > 15 && flock.length >= MAX_AMBIENT) { if (ambient[0].perch) takeOff(ambient[0]); flock.splice(flock.indexOf(ambient[0]), 1); }
+    const b = spawn(sprite, { ambient: false, size: rand(1.1, 1.4), name: item.name, id: item.id });
+    if (entrance) {
+      Object.assign(b, { crowd: Math.min(crowd, 1.5), arrive: 0, x: 0, y: -10, z: -560, vx: 0, vy: 0, vz: 0, flap: 0 });
+      hero = b;
+    }
+    return b;
+  }
+
+  // Sparkles
+  const sparks = [];
+  const burst = (x, y, z, n, spread, hueish) => {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2), sp = rand(0.2, 1) * spread;
+      sparks.push({ x, y, z, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: rand(-1, 1) * sp * 0.5, life: rand(1, 2.4), age: 0, r: rand(1, 3.2), hue: hueish ?? rand(300, 360) });
+    }
+  };
+
+  // Pointer / touch on the wall scatters butterflies
+  const pointer = { x: 0, y: 0, active: 0 };
+  addEventListener('pointermove', (e) => { const k = W / 1600; pointer.x = (e.clientX - W / 2) / k; pointer.y = (e.clientY - H / 2) / k; pointer.active = 1; });
+  addEventListener('pointerdown', (e) => { const k = W / 1600; pointer.x = (e.clientX - W / 2) / k; pointer.y = (e.clientY - H / 2) / k; pointer.active = 2; });
+
+  // Keys
+  const qr = document.getElementById('qr'), hint = document.getElementById('hint'), caption = document.getElementById('caption');
+  setTimeout(() => hint.style.opacity = 0, 8000);
+  addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (k === 'f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    if (k === 'q') setQr(!settings.qr);
+    if (k === 'a') setAmbient(!settings.ambient);
+    if (k === 'm') menuBtn.click();
+    if (k === 'escape') menu.hidden = true;
+    if (k === 't') queue.push({ sprite: makeSprite(collageButterfly(3, Math.random())), item: { name: 'Test' } });
+    if (k === 'c') setCam(!settings.cam);
+    if (k === 'v') { const pv = document.getElementById('preview'); pv.style.display = pv.style.display === 'none' ? 'block' : 'none'; pv.srcObject = body.video.srcObject; pv.play(); }
+    if (k === 'r') clearAll();
+  });
+
+  // Webcam: translucent live cutout of people + butterflies that perch on head, shoulders and hands.
+  const body = new BodyTracker();
+  let camOn = false, camReady = false;
+  function setCam(on) {
+    settings.cam = on; saveSettings(); camOn = on; syncMenu();
+    if (on) body.start().then(() => { camReady = camOn; if (!camOn) body.stop(); }).catch((e) => { console.warn('Camera unavailable:', e.message); camReady = false; });
+    else { camReady = false; body.stop(); }
+  }
+  const PERCH_SLOTS = { head: [[-0.22, -0.02], [0.24, 0.06], [0.02, -0.16]], shoulder: [[0, 0], [0.16, -0.03]], hand: [[0, 0], [0.12, -0.14]], limb: [[0, 0], [0.14, 0.06]] };
+  const perches = new Map();
+  window.bw = { body, perches, flock, get camReady() { return camReady; } }; // key -> { point, slots: [butterfly|null], seen }
+
+  // ⋯ settings menu
+  const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('menu');
+  const optCam = document.getElementById('optCam'), optAmbient = document.getElementById('optAmbient'), optQr = document.getElementById('optQr');
+  function setQr(on) { settings.qr = on; saveSettings(); qr.classList.toggle('off', !on); syncMenu(); }
+  function syncMenu() { optCam.checked = settings.cam; optAmbient.checked = settings.ambient; optQr.checked = settings.qr; }
+  menuBtn.addEventListener('click', (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; menuBtn.setAttribute('aria-expanded', !menu.hidden); });
+  menu.addEventListener('pointerdown', (e) => e.stopPropagation());
+  addEventListener('pointerdown', () => { menu.hidden = true; menuBtn.setAttribute('aria-expanded', false); });
+  optCam.addEventListener('change', () => setCam(optCam.checked));
+  optAmbient.addEventListener('change', () => { setAmbient(optAmbient.checked); syncMenu(); });
+  optQr.addEventListener('change', () => setQr(optQr.checked));
+  function clearAll() { if (confirm('Remove all uploaded butterflies from the wall?')) clearButterflies().then(() => STATIC && onReset()); }
+  document.getElementById('clearAll').addEventListener('click', clearAll);
+  let cursorTimer;
+  addEventListener('pointermove', () => { document.body.classList.add('show-cursor'); menuBtn.style.opacity = ''; clearTimeout(cursorTimer); cursorTimer = setTimeout(() => document.body.classList.remove('show-cursor'), 2500); });
+  // Video pixel -> screen px (mirrored, object-fit: cover)
+  const cover = () => { const vw = body.width, vh = body.height, sc = Math.max(W / vw, H / vh); return { sc, ox: (W - vw * sc) / 2, oy: (H - vh * sc) / 2, vw, vh }; };
+  const vidToWorld = (x, y) => { const c = cover(), k = W / 1600; return [((c.ox + (c.vw - x) * c.sc) - W / 2) / k, ((c.oy + y * c.sc) - H / 2) / k]; };
+
+  let nextRecruit = 0;
+  const lures = [];
+  function updatePerches(dt, nowMs) {
+    if (!camOn || !camReady) { for (const p of perches.values()) p.slots.forEach((b, i) => b && takeOff(b)); perches.clear(); return []; }
+    body.update(nowMs);
+    const repel = [];
+    const k = W / 1600, c = cover();
+    const cands = [];
+    for (const person of body.people) {
+      const personW = person.scale * c.vw * c.sc / k; // shoulder width in world units
+      for (const pt of Object.values(person.points)) {
+        let perch = perches.get(pt.key);
+        if (!perch) { perch = { slots: PERCH_SLOTS[pt.kind].map(() => null) }; perches.set(pt.key, perch); }
+        perch.seen = nowMs; perch.ok = pt.ok; perch.kind = pt.kind; perch.personW = personW; perch.person = person.id;
+        [perch.x, perch.y] = vidToWorld(pt.x, pt.y);
+        if (!pt.ok) continue;
+        const fast = pt.speed > (pt.kind === 'hand' ? 1.8 : 1.3);
+        if (fast) {
+          perch.slots.forEach((b) => b && takeOff(b));
+          if (pt.kind === 'hand') repel.push({ x: perch.x, y: perch.y, r: 140 + pt.speed * 120, f: 3000 + pt.speed * 4000 });
+          continue;
+        }
+        const free = perch.slots.indexOf(null);
+        if (free >= 0 && pt.still > 0.12) cands.push({ perch, free, kind: pt.kind, person: person.id });
+      }
+    }
+    // Share the flock fairly: the next butterfly goes to whoever has the fewest, one a beat apart.
+    const nP = body.people.length;
+    if (cands.length && nowMs > nextRecruit && Math.random() < dt * 6) {
+      const have = new Map(body.people.map((p) => [p.id, 0]));
+      for (const b of flock) if (b.perch && have.has(b.perch.perch.person)) have.set(b.perch.perch.person, have.get(b.perch.perch.person) + 1);
+      const avail = flock.filter((b) => b !== hero).length, cap = Math.max(2, Math.ceil(avail / Math.max(1, nP)));
+      const open = cands.filter((cd) => have.get(cd.person) < cap);
+      if (open.length) {
+        const least = Math.min(...open.map((cd) => have.get(cd.person)));
+        const pool = open.filter((cd) => have.get(cd.person) === least);
+        const cd = pool[Math.floor(Math.random() * pool.length)];
+        recruit(cd.perch, cd.free, cd.kind);
+        nextRecruit = nowMs + rand(140, 420) / Math.sqrt(Math.max(1, nP));
+      }
+    }
+    lures.length = 0;
+    for (const perch of perches.values()) if (perch.ok && nowMs - perch.seen < 300) lures.push(perch);
+    for (const [key, perch] of perches) { if (perch.ok) perch.okAt = nowMs; if (nowMs - perch.seen > 2500 || nowMs - (perch.okAt ?? nowMs) > 2500) { perch.slots.forEach((b) => b && takeOff(b)); perches.delete(key); } }
+    return repel;
+  }
+  function recruit(perch, slot, kind) {
+    let best = null, bd = Infinity;
+    for (const b of flock) {
+      if (b === hero || b.perch || b.cooldown > 0) continue;
+      const d = (Math.hypot(b.x - perch.x, b.y - perch.y) + b.z * 0.3 + (b.ambient ? 0 : -200)) * rand(0.8, 1.25);
+      if (d < bd) { bd = d; best = b; }
+    }
+    if (!best) return;
+    perch.slots[slot] = best;
+    best.perch = { perch, slot, kind, landed: false, stay: rand(30, 60), t: 0, hover: 0, tilt: rand(-0.35, 0.35), side: Math.random() < 0.5 ? -1 : 1, ox: 0, oy: 0, sx: 0, sy: 0, nextShuffle: rand(5, 12), pump: rand(2, 6) };
+  }
+  function takeOff(b) {
+    const p = b.perch; if (!p) return;
+    if (p.perch.slots[p.slot] === b) p.perch.slots[p.slot] = null;
+    b.perch = null; b.cooldown = rand(1.5, 3); b.free = rand(2.5, 4.5); b.flapAmt = 1; b.flap += Math.PI;
+    const off = PERCH_SLOTS[p.kind][p.slot][0] || rand(-0.1, 0.1);
+    b.vx = Math.sign(off || rand(-1, 1)) * rand(120, 300); b.vy = rand(-320, -160); b.vz = rand(120, 320);
+  }
+  function flyPerched(b, dt) {
+    const p = b.perch, pr = p.perch, off = PERCH_SLOTS[p.kind][p.slot];
+    p.t += dt;
+    const tx = pr.x + off[0] * pr.personW + p.ox, ty = pr.y + off[1] * pr.personW - 14 + p.oy, tz = -10;
+    const dx = tx - b.x, dy = ty - b.y, dz = tz - b.z, dist = Math.hypot(dx, dy, dz);
+    const perchScale = Math.max(0.45, Math.min(1.1, pr.personW / 420));
+    if (!p.landed) {
+      // Flutter in on a curving, bobbing path; slow down, hover a moment, then settle.
+      const ux = dx / (dist + 1), uy = dy / (dist + 1), uz = dz / (dist + 1);
+      const far = Math.min(1, dist / 260);
+      const sp = Math.min(950, 90 + dist * 2.4);
+      const sway = (Math.sin(p.t * 3.1 + b.wob) * 0.55 + p.side * 0.35) * far * sp;
+      const bob = (Math.sin(p.t * 9.5 + b.wob * 2) * 70 + Math.sin(p.t * 4.3) * 40) * (0.3 + 0.7 * far);
+      const tvx = ux * sp - uy * sway, tvy = uy * sp + ux * sway + bob, tvz = uz * sp;
+      const k = 1 - Math.pow(0.004, dt);
+      b.vx = lerp(b.vx, tvx, k); b.vy = lerp(b.vy, tvy, k); b.vz = lerp(b.vz, tvz, k);
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      b.scaleBoost = lerp(b.scaleBoost || 1, perchScale / b.size, 1 - Math.pow(0.1, dt));
+      b.roll = lerp(b.roll, Math.max(-0.6, Math.min(0.6, b.vx * 0.0012)), 0.1);
+      b.flapAmt = lerp(b.flapAmt ?? 1, 1, 0.1);
+      if (dist < 60) p.hover += dt;
+      if (dist < 12 && p.hover > 0.3) { p.landed = true; p.t = 0; burst(b.x, b.y, b.z, 8, 50, rand(300, 340)); }
+    } else {
+      // Ride along with the person; rest with slow wing pumps and the odd shuffle.
+      const k = 1 - Math.pow(1e-5, dt);
+      b.x = lerp(b.x, tx, k); b.y = lerp(b.y, ty, k); b.z = lerp(b.z, tz, k);
+      b.vx = b.vy = b.vz = 0;
+      p.pump -= dt; p.nextShuffle -= dt;
+      if (p.nextShuffle < 0) { p.nextShuffle = rand(6, 14); p.ox = rand(-0.05, 0.05) * pr.personW; p.oy = rand(-0.03, 0.03) * pr.personW; p.tilt = rand(-0.4, 0.4); p.pump = 0.7; }
+      if (p.pump < -0.9) p.pump = rand(3, 8);
+      const settle = Math.min(1, p.t / 1.2);
+      const rest = p.pump < 0 ? 0.95 : 0.6 + 0.2 * Math.max(0, Math.sin(p.t * 0.4 + b.wob));
+      p.rate = lerp(p.rate ?? 6, p.pump < 0 ? 7 : 2.6 + Math.sin(b.wob) * 0.6, 1 - Math.pow(0.05, dt));
+      b.flapAmt = lerp(b.flapAmt ?? 1, lerp(1, rest, settle), 1 - Math.pow(0.02, dt));
+      b.scaleBoost = lerp(b.scaleBoost || 1, perchScale / b.size, 0.1);
+      b.roll = lerp(b.roll, p.tilt, 1 - Math.pow(0.15, dt)); b.pitch = 1;
+      if (p.t > p.stay) takeOff(b);
+    }
+  }
+
+  // Eric Carle–style painted-paper garden, baked once per resize; plants sway each frame.
+  let garden = null, gardenKey = '';
+  function drawRoom(time) {
+    const key = `${cv.width}x${cv.height}`;
+    if (key !== gardenKey) { gardenKey = key; garden = makeGarden(cv.width, cv.height, { cat: catArt }); }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); drawGarden(ctx, garden, time); ctx.restore();
+  }
+  const hc = document.createElement('canvas'), hctx = hc.getContext('2d');
+  function drawButterfly(b, time, alphaMul = 1, glow = 0, g = ctx) {
+    const [sx, sy, s] = project(b.x, b.y, b.z);
+    if (s <= 0) return;
+    const sc = s * b.size * (b.scaleBoost || 1) * (b.crowd ?? crowd);
+    const sp = b.sprite;
+    const flapAmt = b.flapAmt ?? 1;
+    const open = lerp(1, 0.12 + 0.88 * (0.5 + 0.5 * Math.cos(b.flap)), flapAmt);
+    const bob = Math.sin(b.flap) * 3 * flapAmt;
+    const depthFade = Math.max(0.25, Math.min(1, 1.25 - b.z / 2200));
+    g.save();
+    g.translate(sx, sy + bob * sc);
+    g.rotate(b.roll);
+    g.scale(sc, sc * (0.82 + 0.18 * (b.pitch ?? 1)));
+    g.globalAlpha = depthFade * alphaMul;
+    if (glow > 0) { g.shadowColor = `rgba(255,200,235,${glow})`; g.shadowBlur = 60 * glow * DPR; }
+    const need = sp.lw * sc * DPR * 1.4;
+    let m = sp.mips ? sp.mips[0] : sp;
+    if (sp.mips) for (const lv of sp.mips) if (lv.w >= need) m = lv;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(m.L, -sp.lw * open, -sp.h / 2, sp.lw * open, sp.h);
+    g.drawImage(m.R, 0, -sp.h / 2, sp.rw * open, sp.h);
+    g.restore();
+  }
+
+  const silCv = document.createElement('canvas'), silCtx = silCv.getContext('2d');
+  function drawSilhouette() {
+    if (!body.people.length && !body.sil.width) return;
+    const c = cover();
+    if (silCv.width !== cv.width || silCv.height !== cv.height) { silCv.width = cv.width; silCv.height = cv.height; }
+    const g = silCtx;
+    g.globalCompositeOperation = 'source-over'; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, silCv.width, silCv.height);
+    g.setTransform(DPR, 0, 0, DPR, 0, 0); g.translate(c.ox + c.vw * c.sc, c.oy); g.scale(-c.sc, c.sc);
+    g.imageSmoothingQuality = 'high'; g.drawImage(body.sil, 0, 0, c.vw, c.vh);
+    // Fill the person shape with the live camera image, mirrored, and lay it on the page see-through.
+    g.globalCompositeOperation = 'source-in';
+    g.filter = 'saturate(1.05) contrast(0.95) brightness(1.2)';
+    g.drawImage(body.video, 0, 0, c.vw, c.vh);
+    g.filter = 'none'; g.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.22;
+    ctx.drawImage(silCv, 0, 0);
+    ctx.restore();
+  }
+
+  // Few butterflies: big. As more arrive, everyone shrinks smoothly to make room.
+  let crowd = 3.6;
+  const crowdTarget = (n) => Math.max(0.75, 3.6 * Math.pow(2 / Math.max(2, n), 0.5));
+  let last = performance.now() / 1000;
+  function frame() {
+    const now = performance.now() / 1000, dt = Math.min(0.05, now - last); last = now;
+    const time = now - t0;
+
+    // Pull next arrival
+    if (!hero && queue.length) {
+      const { sprite, item } = queue.shift();
+      addUploaded(sprite, item, true);
+    }
+
+    // Swarm centre drifts slowly
+    const cxw = Math.sin(time * 0.05) * 160, cyw = Math.sin(time * 0.07 + 1) * 60, czw = 600;
+    const vortexSpin = time;
+
+    crowd = lerp(crowd, crowdTarget(flock.length), Math.min(1, dt * 0.8));
+    for (const b of flock) b.crowd = lerp(b.crowd ?? crowd, b.perch ? 1 : b === hero && b.arrive < 6.2 ? Math.min(crowd, 1.5) : crowd, Math.min(1, dt * 2));
+    const repellers = updatePerches(dt, now * 1000);
+    if (pointer.active) repellers.push({ x: pointer.x, y: pointer.y, r: pointer.active === 2 ? 260 : 170, f: pointer.active === 2 ? 9000 : 4000 });
+    for (const b of flock) {
+      b.flap += b.perch?.landed ? dt * (b.perch.rate ?? 3) : dt * b.flapSpeed * (b.flapAmt ?? 1) + dt * 0.5;
+      if (b === hero) continue;
+      if (b.cooldown > 0) b.cooldown -= dt;
+      if (b.perch) { flyPerched(b, dt); continue; }
+      if (b.flapAmt !== undefined && b.flapAmt < 1) b.flapAmt = Math.min(1, b.flapAmt + dt * 1.5);
+      if (b.scaleBoost && !b.arrive) b.scaleBoost = lerp(b.scaleBoost, 1, 0.03);
+      const ang = b.orbitP + vortexSpin * b.orbitW * 2;
+      const tx = cxw + Math.cos(ang) * b.orbitR + Math.sin(time * 0.3 + b.wob) * 60;
+      const ty = cyw + b.yOff + Math.sin(ang * 2 + b.wob) * b.orbitR * 0.18 + Math.sin(time * 0.9 + b.wob) * 25;
+      const tz = czw + Math.sin(ang) * b.orbitR * b.orbitE + b.zOff - 450;
+      if (b.free > 0) b.free -= dt;
+      const pull = b.free > 0 ? 0.9 * (1 - Math.min(1, b.free / 3)) + 0.08 : 0.9;
+      let ax = (tx - b.x) * pull, ay = (ty - b.y) * pull, az = (tz - b.z) * pull;
+      // Erratic, bobbing butterfly flight rather than smooth orbits.
+      ax += Math.sin(time * 1.7 + b.wob * 5) * 90; ay += Math.sin(time * 6.1 + b.wob * 3) * 160 + Math.sin(time * 2.3 + b.wob) * 70;
+      // Soft affinity: idle butterflies drift toward nearby people and loiter around them.
+      if (lures.length && b.ambient && b.cooldown <= 0) {
+        let best = null, bd = Infinity;
+        for (const l of lures) { const d = Math.hypot(l.x - b.x, l.y - b.y); if (d < bd) { bd = d; best = l; } }
+        if (best && bd < 900) { const w = 0.35 * (1 - bd / 900); ax += (best.x + Math.sin(time * 0.8 + b.wob) * 180 - b.x) * w; ay += (best.y + Math.cos(time * 0.6 + b.wob) * 120 - b.y) * w; az += (180 - b.z) * w; }
+      }
+      if (repellers.length) {
+        const px = b.x * F / (F + b.z), py = b.y * F / (F + b.z);
+        for (const r of repellers) {
+          const dx = px - r.x, dy = py - r.y, d2 = dx * dx + dy * dy;
+          if (d2 < r.r * r.r) { const d = Math.sqrt(d2) + 1, f = (1 - d / r.r) * r.f; ax += dx / d * f; ay += dy / d * f; az -= f * 0.2; }
+        }
+      }
+      b.vx += ax * dt; b.vy += ay * dt; b.vz += az * dt;
+      const damp = Math.pow(0.35, dt); b.vx *= damp; b.vy *= damp; b.vz *= damp;
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      b.roll = lerp(b.roll, Math.max(-0.7, Math.min(0.7, b.vx * 0.0016 + Math.sin(time + b.wob) * 0.12)), 0.08);
+      b.pitch = 0.6 + 0.4 * Math.cos(b.wob + time * 0.4);
+      if (b.trail) { b.trail -= dt; if (Math.random() < 0.6) burst(b.x, b.y, b.z, 1, 30, rand(290, 340)); }
+    }
+    if (pointer.active === 2) pointer.active = 1;
+
+    // Hero entrance timeline
+    let spotlight = 0;
+    if (hero) {
+      const b = hero; b.arrive += dt; const a = b.arrive;
+      spotlight = ease(a / 0.8) * (1 - ease((a - 6.2) / 1.2));
+      b.flapAmt = ease((a - 2.2) / 1.6);
+      b.alpha = ease(a / 0.9);
+      b.glow = Math.max(0, Math.sin(Math.min(1, (a - 0.6) / 2.2) * Math.PI)) * 0.9;
+      b.scaleBoost = lerp(1.2, 1.8, ease(a / 1.2)) * (1 - 0.45 * ease((a - 6.2) / 2.4));
+      b.roll = Math.sin(a * 1.3) * 0.06 * b.flapAmt;
+      b.pitch = 1;
+      b.sat = 0.35 + 0.65 * ease((a - 0.8) / 1.8);
+      if (a > 0.8 && a < 3.0 && Math.random() < 0.9) {
+        const sp = b.sprite;
+        burst(b.x + rand(-sp.lw, sp.rw) * b.size * 1.7, b.y + rand(-sp.h / 2, sp.h / 2) * b.size * 1.7, b.z, 2, 60);
+      }
+      if (a > 0.8 && !b.burst1) { b.burst1 = 1; burst(b.x, b.y, b.z, 120, 520); }
+      if (a > 2.2 && a < 6.5) { b.y += Math.sin(a * 2) * 0.3; }
+      if (a > 1.0 && !b.captioned) {
+        b.captioned = 1;
+        caption.textContent = b.name ? `${b.name}’s butterfly` : 'A new butterfly';
+        caption.classList.add('on');
+      }
+      if (a > 6.2) {
+        caption.classList.remove('on');
+        // fly away into the swarm
+        const tt = ease((a - 6.2) / 2.6);
+        b.vy = lerp(b.vy, -120, 0.02); b.vz = lerp(b.vz, 600, 0.02); b.vx = lerp(b.vx, 220 * Math.sign(Math.sin(b.orbitP) || 1), 0.02);
+        b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+        b.glow = 0.5 * (1 - tt);
+        b.roll = lerp(b.roll, 0.25, 0.03);
+      }
+      if (a > 8.8) { b.glow = 0; b.trail = 14; b.sat = 1; hero = null; }
+    }
+
+    // Draw
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    drawRoom(time);
+    const order = flock.filter((b) => b !== hero).sort((a, b) => b.z - a.z);
+    const showSil = camOn && camReady && body.width;
+    let silDrawn = !showSil;
+    for (const b of order) {
+      if (!silDrawn && (b.z < 40 || b.perch)) { drawSilhouette(); silDrawn = true; }
+      drawButterfly(b, time, 1 - spotlight * 0.55, 0);
+    }
+    if (!silDrawn) drawSilhouette();
+
+    // Sparkles (paper confetti)
+    ctx.globalCompositeOperation = 'source-over';
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i]; p.age += dt;
+      if (p.age > p.life) { sparks.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vx *= 0.97; p.vy = p.vy * 0.97 + 8 * dt; p.vz *= 0.97;
+      const [x, y, s] = project(p.x, p.y, p.z), k = 1 - p.age / p.life;
+      const tw = 0.6 + 0.4 * Math.sin(p.age * 30 + i);
+      ctx.fillStyle = `hsla(${p.hue}, 85%, 58%, ${k * tw})`;
+      ctx.beginPath(); ctx.arc(x, y, p.r * s * 1.6, 0, 7); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (hero) {
+      const [hx, hy, hs] = project(hero.x, hero.y, hero.z);
+      if (spotlight > 0) {
+        const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, 420 * hs * 1.6);
+        g.addColorStop(0, `rgba(255,170,220,${0.16 * spotlight})`); g.addColorStop(1, 'rgba(255,180,225,0)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+      if (hc.width !== cv.width || hc.height !== cv.height) { hc.width = cv.width; hc.height = cv.height; }
+      hctx.setTransform(1, 0, 0, 1, 0, 0); hctx.clearRect(0, 0, hc.width, hc.height);
+      hctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      hctx.filter = `saturate(${hero.sat}) brightness(${1 + hero.glow * 0.35})`;
+      drawButterfly(hero, time, hero.alpha, 0, hctx);
+      hctx.filter = 'none';
+      // Light sweep across the drawing as it "wakes", clipped to the wings
+      const a = hero.arrive;
+      if (a > 0.8 && a < 3.2) {
+        const p = (a - 0.8) / 2.4, sp = hero.sprite, sc = hs * hero.size * hero.scaleBoost * (hero.crowd ?? crowd);
+        const x0 = hx - sp.lw * sc, x1 = hx + sp.rw * sc, bx = lerp(x0 - 120, x1 + 120, p);
+        const g = hctx.createLinearGradient(bx - 110, hy - 60, bx + 110, hy + 60);
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, `rgba(255,246,252,${0.85 * Math.sin(p * Math.PI)})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+        hctx.globalCompositeOperation = 'source-atop'; hctx.fillStyle = g; hctx.fillRect(0, 0, W, H);
+        hctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (hero.glow > 0) { ctx.shadowColor = `rgba(255,190,230,${hero.glow})`; ctx.shadowBlur = 70 * hero.glow * DPR; }
+      ctx.drawImage(hc, 0, 0); ctx.restore();
+    }
+    requestAnimationFrame(frame);
+  }
+  setQr(settings.qr); if (settings.ambient) setAmbient(true); setCam(settings.cam); syncMenu();
+  requestAnimationFrame(frame);
+
+  // Keep the QR's link visible in the console for setup.
+  if (STATIC) console.log('Upload URL:', uploadUrl()); else fetch('./api/config').then((r) => r.json()).then((c) => console.log('Upload URL:', c.uploadUrl));
+</script>
+</body>
+</html>
