@@ -1,4 +1,4 @@
-import { SHEET, ART, WING, fillSilhouette, templateSvg } from './shape.js';
+import { SHEET, ART, WING, fillSilhouette, templateSvg } from './shape.js?v=2';
 import { STATIC } from './net.js';
 
 const PX = 4; // output pixels per template unit

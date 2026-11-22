@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Butterfly colouring sheet</title>
 <style>
-  @page { size: landscape; margin: 0; }
+  @page { size: letter landscape; margin: 0; }
   html, body { margin: 0; background: #e9e7e3; font-family: ui-sans-serif, -apple-system, "Segoe UI", Helvetica, sans-serif; color: #111; }
   .sheet { background: #fff; width: 279mm; height: 215mm; margin: 24px auto; padding: 9mm 11mm 8mm; box-sizing: border-box; display: grid; grid-template-rows: auto 1fr auto; gap: 3mm; box-shadow: 0 6px 40px rgba(0,0,0,.14); overflow: hidden; }
   header { display: flex; align-items: baseline; justify-content: space-between; }
@@ -39,7 +39,7 @@
   </footer>
 </div>
 <script type="module">
-  import { sheetSvg } from './shape.js';
+  import { sheetSvg } from './shape.js?v=2';
   import { qrSrc } from './net.js';
   qrSrc().then((s) => { document.getElementById('qr').src = s; });
   document.getElementById('art').innerHTML = sheetSvg({ width: 1.25 });

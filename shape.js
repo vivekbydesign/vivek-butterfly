@@ -1,24 +1,24 @@
 // Right-half butterfly geometry in a 200x160 box centred on the body (x=0). Left half is mirrored.
 export const WING = {
-  upper: 'M2,-6 C10,-42 40,-76 78,-71 C97,-68 99,-47 90,-33 C80,-16 52,-6 2,-2 Z',
-  lower: 'M2,2 C34,0 66,10 70,34 C73,55 56,69 40,63 C26,58 10,40 2,8 Z',
-  upperSpots: [[66, -50, 11], [44, -32, 7], [82, -46, 5]],
-  lowerSpots: [[46, 40, 10], [28, 26, 5]],
-  upperVeins: ['M4,-4 C30,-30 50,-50 70,-62', 'M4,-3 C40,-20 70,-30 88,-38', 'M4,-5 C20,-36 30,-56 40,-66'],
-  lowerVeins: ['M4,4 C24,20 40,40 50,56', 'M4,3 C30,10 50,20 66,30'],
-  body: 'M0,-26 C4,-26 5,-12 4,4 C3,22 1,34 0,36 C-1,34 -3,22 -4,4 C-5,-12 -4,-26 0,-26 Z',
-  antenna: 'M1,-30 C6,-44 12,-54 20,-60',
+  outline: 'M4,-20 C20,-44 50,-74 86,-81 C96,-82 100,-74 98,-62 C96,-46 88,-22 76,-10 C68,-2 56,2 48,3 C60,8 72,18 73,32 C74,42 70,46 68,52 C66,58 60,58 58,63 C56,70 52,73 46,72 C34,70 24,54 14,36 C9,26 6,16 4,8 Z',
+  upper: 'M4,-20 C20,-44 50,-74 86,-81 C96,-82 100,-74 98,-62 C96,-46 88,-22 76,-10 C68,-2 56,2 48,3 L4,4 Z',
+  lower: 'M4,4 L48,3 C60,8 72,18 73,32 C74,42 70,46 68,52 C66,58 60,58 58,63 C56,70 52,73 46,72 C34,70 24,54 14,36 C9,26 6,16 4,8 Z',
+  upperSpots: [[72, -58, 9], [48, -34, 6], [88, -62, 4]],
+  lowerSpots: [[52, 40, 8], [32, 28, 5]],
+  upperVeins: ['M4,-4 C30,-30 55,-55 80,-72', 'M4,-3 C40,-20 70,-30 92,-40', 'M4,-6 C20,-30 30,-48 40,-60'],
+  lowerVeins: ['M4,4 C24,20 36,40 44,64', 'M4,3 C30,10 52,20 68,34'],
+  body: 'M0,-24 C4,-24 4.5,-10 4,6 C3.5,26 2,46 0,50 C-2,46 -3.5,26 -4,6 C-4.5,-10 -4,-24 0,-24 Z',
+  antenna: 'M2,-34 C5,-42 12,-52 20,-60',
+  club: [20, -60, 2.2],
 };
 
 const mirror = (d) => d.replace(/(-?\d+(?:\.\d+)?),/g, (_, x) => `${-Number(x)},`);
 
 export function templateSvg({ stroke = '#111', width = 1.4 } = {}) {
+  const [cx, cy, cr] = WING.club;
   const half = (flip) => {
     const t = flip ? mirror : (d) => d;
-    const spots = [...WING.upperSpots, ...WING.lowerSpots]
-      .map(([x, y, r]) => `<circle cx="${flip ? -x : x}" cy="${y}" r="${r}"/>`).join('');
-    const veins = [...WING.upperVeins, ...WING.lowerVeins].map((d) => `<path d="${t(d)}"/>`).join('');
-    return `<path d="${t(WING.upper)}"/><path d="${t(WING.lower)}"/>${spots}${veins}<path d="${t(WING.antenna)}"/>`;
+    return `<path d="${t(WING.outline)}"/><path d="${t(WING.antenna)}"/><circle cx="${flip ? -cx : cx}" cy="${cy}" r="${cr}"/>`;
   };
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-104 -82 208 156" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round">
     ${half(false)}${half(true)}<path d="${WING.body}"/><circle cx="0" cy="-30" r="4.5"/>
@@ -54,7 +54,7 @@ export function fillSilhouette(g, { outline = 1.8, antenna = 2.6 } = {}) {
   for (const flip of [1, -1]) {
     g.save(); g.scale(flip, 1);
     for (const d of [WING.upper, WING.lower]) { const p = new Path2D(d); g.fill(p); if (outline) { g.lineWidth = outline; g.stroke(p); } }
-    if (antenna) { g.lineWidth = antenna; g.stroke(new Path2D(WING.antenna)); }
+    if (antenna) { g.lineWidth = antenna; g.stroke(new Path2D(WING.antenna)); g.beginPath(); g.arc(WING.club[0], WING.club[1], WING.club[2] + antenna / 2, 0, 7); g.fill(); }
     g.restore();
   }
   const body = new Path2D(WING.body); g.fill(body); if (outline) { g.lineWidth = outline; g.stroke(body); }

@@ -74,8 +74,8 @@
   </div>
 </main>
 <script type="module">
-  import { extractButterfly } from './process.js?v=clean-cutout-1';
-  import { templateSvg } from './shape.js';
+  import { extractButterfly } from './process.js?v=simple-butterfly-1';
+  import { templateSvg } from './shape.js?v=2';
   import { sendButterfly } from './net.js';
   const $ = (id) => document.getElementById(id);
   $('ghost').innerHTML = templateSvg({ stroke: '#ff8fc8', width: 1.2 });

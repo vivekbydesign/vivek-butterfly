@@ -1,6 +1,6 @@
 // Eric Carle–style collage, generated in code: acrylic washes and dry-brush streaks on tissue,
 // cut into simple shapes with scissors and pasted flat on a white page.
-import { WING } from './shape.js';
+import { WING } from './shape.js?v=2';
 import { artSrc } from './art.js';
 const TAU = Math.PI * 2;
 let seed = 11;
@@ -416,7 +416,7 @@ export function collageButterfly(scale = 2, s = Math.random()) {
   g.translate(W2, 82 * scale); g.scale(scale, scale);
   g.strokeStyle = '#3a2a10'; g.lineWidth = 1.2; g.lineCap = 'round';
   for (const f of [1, -1]) { g.save(); g.scale(f, 1); g.stroke(new Path2D(WING.antenna)); g.beginPath(); g.arc(20, -60, 1.8, 0, TAU); g.fillStyle = '#3a2a10'; g.fill(); g.restore(); }
-  paste(g, new Path2D(WING.body), 'gold', Math.PI / 2, u, [-6, -28, 12, 66], { scratch: true });
+  paste(g, new Path2D(WING.body), 'gold', Math.PI / 2, u, [-6, -36, 12, 90], { scratch: true });
   paste(g, blob(0, -30, 5, 5, 0.04), 'gold', 0, u, box(0, -30, 6));
   return { canvas: c, cx: c.width / 2 };
 }
