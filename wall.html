@@ -359,6 +359,23 @@
     g.drawImage(m.L, -sp.lw * open, -sp.h / 2, sp.lw * open, sp.h);
     g.drawImage(m.R, 0, -sp.h / 2, sp.rw * open, sp.h);
     g.restore();
+    if (b.name && b !== hero) {
+      const lb = b.label || (b.label = nameLabel(b.name));
+      const fs = Math.max(11, sp.h * sc * 0.11), w = (lb.width / lb.height) * fs * 1.6;
+      g.save(); g.globalAlpha = depthFade * alphaMul;
+      g.drawImage(lb, sx - w / 2, sy + bob * sc + sp.h * sc * 0.44, w, fs * 1.6);
+      g.restore();
+    }
+  }
+  // Rendered once per name at high resolution, then scaled with its butterfly.
+  function nameLabel(text) {
+    const fs = 96, font = `600 ${fs}px Futura, "Avenir Next", "Arial Rounded MT Bold", Arial, sans-serif`;
+    const c = document.createElement('canvas'), g = c.getContext('2d');
+    g.font = font; c.width = Math.ceil(g.measureText(text).width + fs * 0.6); c.height = Math.ceil(fs * 1.6);
+    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    g.lineWidth = fs * 0.16; g.strokeStyle = 'rgba(255,253,248,.92)'; g.strokeText(text, c.width / 2, c.height / 2);
+    g.fillStyle = '#3a2614'; g.fillText(text, c.width / 2, c.height / 2);
+    return c;
   }
 
   const silCv = document.createElement('canvas'), silCtx = silCv.getContext('2d');
