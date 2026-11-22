@@ -4,15 +4,15 @@ import { STATIC } from './net.js';
 const PX = 4; // output pixels per template unit
 
 // Photo of a coloured-in sheet -> transparent, colour-corrected cut-out.
-// Primary path registers the printed corner squares and clips with the exact template shape;
-// photos without the squares fall back to a heuristic cut-out.
+// Require registration to the printed sheet so page fragments cannot become part of the cut-out.
 export async function extractButterfly(file) {
   const bmp = file instanceof HTMLCanvasElement ? file : await decodeUpright(file);
   const full = toCanvas(bmp, 2400);
   try { return { ...(await fromTemplate(full)), mode: 'template' }; }
-  catch (e) { console.warn('Template registration failed:', e.message); }
-  const r = await extractFreehand(full);
-  return { ...r, mode: r.outlined ? 'outline' : 'freehand' };
+  catch (e) {
+    console.warn('Template registration failed:', e.message);
+    throw new Error('Could not align the butterfly. Retake with all four black corner squares visible, the sheet flat, and good light.');
+  }
 }
 
 // <img> applies the photo's EXIF rotation in all current browsers (createImageBitmap doesn't on some iOS versions).
@@ -141,7 +141,7 @@ async function fromTemplate(full) {
   }
 
   // 5. White-balance against the visible paper around the butterfly.
-  const inner = silhouetteCanvas(OW, OH, 0, 0), band = silhouetteCanvas(OW, OH, 2.4), grown = silhouetteCanvas(OW, OH, 10);
+  const inner = silhouetteCanvas(OW, OH, 0, 0), band = silhouetteCanvas(OW, OH, 1.4, 1.4), grown = silhouetteCanvas(OW, OH, 10);
   const id0 = pixels(inner).data, bd = pixels(band).data, gd = pixels(grown).data;
   whiteBalance(out, OW, OH, (i) => gd[i * 4 + 3] < 10);
 
@@ -150,7 +150,8 @@ async function fromTemplate(full) {
   const cg = c.getContext('2d'), id = cg.createImageData(OW, OH);
   for (let i = 0; i < OW * OH; i++) {
     const r = out[i * 3], g = out[i * 3 + 1], b = out[i * 3 + 2], l = (r + g + b) / 3;
-    const ink = Math.max(0, Math.min(1, (225 - l) / 110));
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+    const ink = Math.max(0, Math.min(1, (225 - l) / 110)) * Math.max(0, Math.min(1, (90 - chroma) / 40));
     id.data[i * 4] = r; id.data[i * 4 + 1] = g; id.data[i * 4 + 2] = b;
     id.data[i * 4 + 3] = Math.max(id0[i * 4 + 3], (bd[i * 4 + 3] / 255) * ink * 255);
   }

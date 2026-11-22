@@ -40,7 +40,7 @@
 <main>
   <section id="s-capture">
     <h1>Release your butterfly</h1>
-    <p>Lay your sheet flat in good light. Fit the whole page in the photo, including the four black corner squares.</p>
+    <p>Lay your sheet flat in good light. Include all four black corner squares so only the butterfly is cut out.</p>
   </section>
   <section id="s-preview" class="hidden">
     <h1>Here it is</h1>
@@ -74,7 +74,7 @@
   </div>
 </main>
 <script type="module">
-  import { extractButterfly } from './process.js';
+  import { extractButterfly } from './process.js?v=clean-cutout-1';
   import { templateSvg } from './shape.js';
   import { sendButterfly } from './net.js';
   const $ = (id) => document.getElementById(id);
@@ -107,7 +107,6 @@
       r.style.cssText = `left:${(cx / w) * 100}%;width:${(1 - cx / w) * 100}%;background-image:url(${url});background-position:100% 0;`;
       bf.classList.remove('hidden');
       show('preview');
-      $('err').textContent = result.mode === 'freehand' ? 'Couldn’t see all four corner squares, so this is a best guess. Retake with the whole page in view for a perfect cut-out.' : '';
     } catch (err) {
       $('err').textContent = err.message;
       $('ghost').classList.remove('hidden');

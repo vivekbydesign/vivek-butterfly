@@ -14,9 +14,13 @@
   .qr.off { opacity: 0; }
   .caption { position: fixed; left: 50%; top: 79%; transform: translate(-50%, 10px); color: #fff; -webkit-text-stroke: 0; font-weight: 700; font-size: clamp(22px, 2.6vw, 44px); font-weight: 500; letter-spacing: .01em; opacity: 0; transition: opacity 1s, transform 1s; text-shadow: 0 2px 0 rgba(40,25,10,.35), 0 0 24px rgba(40,25,10,.35); pointer-events: none; white-space: nowrap; }
   .caption.on { opacity: 1; transform: translate(-50%, 0); }
-  .menu-btn { position: fixed; top: 18px; right: 18px; width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(255,190,225,.4); background: rgba(30,18,32,.85); color: #fff; font-size: 26px; font-weight: 700; line-height: 1; cursor: pointer; backdrop-filter: blur(10px); opacity: .8; transition: opacity .3s; z-index: 1000; display: grid; place-items: center; padding: 0 0 8px; }
-  .menu-btn:hover, .menu-btn[aria-expanded="true"] { opacity: 1; }
-  .menu { position: fixed; top: 66px; right: 18px; min-width: 240px; padding: 8px; border-radius: 16px; background: rgba(16,10,18,.9); border: 1px solid rgba(255,190,225,.18); backdrop-filter: blur(14px); color: #f7eaf2; font-size: 14px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .menu-hotspot { position: fixed; top: 0; right: 0; width: 88px; height: 88px; z-index: 1000; }
+  .menu-btn { position: absolute; top: 20px; right: 20px; width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(255,190,225,.4); background: rgba(30,18,32,.85); color: #fff; cursor: pointer; backdrop-filter: blur(10px); opacity: 0; pointer-events: none; transition: opacity .2s; display: grid; place-items: center; padding: 0; }
+  .menu-btn svg { width: 24px; height: 24px; }
+  .menu-hotspot:hover .menu-btn, .menu-btn:focus-visible, .menu-btn[aria-expanded="true"] { opacity: 1; pointer-events: auto; }
+  .menu-btn:focus-visible { outline: 2px solid #6b5a48; outline-offset: 4px; }
+  @media (prefers-reduced-motion: reduce) { .menu-btn { transition: none; } }
+  .menu { position: fixed; top: 76px; right: 20px; min-width: 240px; padding: 8px; border-radius: 16px; background: rgba(16,10,18,.9); border: 1px solid rgba(255,190,225,.18); backdrop-filter: blur(14px); color: #f7eaf2; font-size: 14px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
   .menu[hidden] { display: none; }
   .menu label { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
   .menu label:hover { background: rgba(255,255,255,.06); }
@@ -38,7 +42,11 @@
   <img id="qrimg" alt="">
   <div><b>Release your butterfly</b><span>Colour one in, then scan<br>to bring it to life here.</span></div>
 </div>
-<button class="menu-btn" id="menuBtn" aria-label="Settings" aria-expanded="false">⋯</button>
+<div class="menu-hotspot" id="menuHotspot">
+  <button class="menu-btn" id="menuBtn" aria-label="Settings" aria-expanded="false" aria-controls="menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg>
+  </button>
+</div>
 <div class="menu" id="menu" hidden>
   <label>Webcam silhouette<kbd>C</kbd><input type="checkbox" id="optCam"></label>
   <label>Ambient butterflies<kbd>A</kbd><input type="checkbox" id="optAmbient"></label>
@@ -174,7 +182,7 @@
     if (k === 'q') setQr(!settings.qr);
     if (k === 'a') setAmbient(!settings.ambient);
     if (k === 'm') menuBtn.click();
-    if (k === 'escape') menu.hidden = true;
+    if (k === 'escape') { menu.hidden = true; menuBtn.setAttribute('aria-expanded', false); }
     if (k === 't') queue.push({ sprite: makeSprite(collageButterfly(3, Math.random())), item: { name: 'Test' } });
     if (k === 'c') setCam(!settings.cam);
     if (k === 'v') { const pv = document.getElementById('preview'); pv.style.display = pv.style.display === 'none' ? 'block' : 'none'; pv.srcObject = body.video.srcObject; pv.play(); }
@@ -199,6 +207,11 @@
   function setQr(on) { settings.qr = on; saveSettings(); qr.classList.toggle('off', !on); syncMenu(); }
   function syncMenu() { optCam.checked = settings.cam; optAmbient.checked = settings.ambient; optQr.checked = settings.qr; }
   menuBtn.addEventListener('click', (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; menuBtn.setAttribute('aria-expanded', !menu.hidden); });
+  menuBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  document.getElementById('menuHotspot').addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || e.target !== e.currentTarget) return;
+    e.preventDefault(); e.stopPropagation(); menuBtn.click();
+  });
   menu.addEventListener('pointerdown', (e) => e.stopPropagation());
   addEventListener('pointerdown', () => { menu.hidden = true; menuBtn.setAttribute('aria-expanded', false); });
   optCam.addEventListener('change', () => setCam(optCam.checked));
@@ -207,7 +220,7 @@
   function clearAll() { if (confirm('Remove all uploaded butterflies from the wall?')) clearButterflies().then(() => STATIC && onReset()); }
   document.getElementById('clearAll').addEventListener('click', clearAll);
   let cursorTimer;
-  addEventListener('pointermove', () => { document.body.classList.add('show-cursor'); menuBtn.style.opacity = ''; clearTimeout(cursorTimer); cursorTimer = setTimeout(() => document.body.classList.remove('show-cursor'), 2500); });
+  addEventListener('pointermove', () => { document.body.classList.add('show-cursor'); clearTimeout(cursorTimer); cursorTimer = setTimeout(() => document.body.classList.remove('show-cursor'), 2500); });
   // Video pixel -> screen px (mirrored, object-fit: cover)
   const cover = () => { const vw = body.width, vh = body.height, sc = Math.max(W / vw, H / vh); return { sc, ox: (W - vw * sc) / 2, oy: (H - vh * sc) / 2, vw, vh }; };
   const vidToWorld = (x, y) => { const c = cover(), k = W / 1600; return [((c.ox + (c.vw - x) * c.sc) - W / 2) / k, ((c.oy + y * c.sc) - H / 2) / k]; };
