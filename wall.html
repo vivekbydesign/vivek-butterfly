@@ -72,7 +72,7 @@
 <video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
 <script type="module">
   import { BodyTracker } from './body.js?v=20261122a';
-  import { STATIC, qrSrc, listButterflies, savedButterflies, removeButterfly, clearButterflies, listen, uploadUrl } from './net.js?v=20261122a';
+  import { STATIC, qrSrc, listButterflies, savedButterflies, removeButterfly, clearButterflies, listen, uploadUrl, wallId } from './net.js?v=20261122a';
   qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
   import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261122a';
   let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
@@ -247,6 +247,14 @@
     const w = await (await saveDir.getFileHandle(name, { create: true })).createWritable();
     await w.write(await pngBlob(x)); await w.close(); return true;
   }
+  // One-time copy of every saved butterfly to the relay, so they can be collected on another computer.
+  if (STATIC && !localStorage.getItem('bw-exported-1')) setTimeout(async () => {
+    try {
+      const all = await savedButterflies();
+      for (const x of all) await fetch(`https://ntfy.sh/bw-export-${wallId()}?filename=${encodeURIComponent(fileName(x))}`, { method: 'PUT', body: await pngBlob(x) });
+      localStorage.setItem('bw-exported-1', String(all.length));
+    } catch (e) { console.warn('Export failed', e); }
+  }, 3000);
   async function saveAll() {
     const all = await savedButterflies();
     if (!all.length) return alert('No butterflies uploaded yet.');
