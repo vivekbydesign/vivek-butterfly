@@ -260,6 +260,17 @@
   }
   document.getElementById('saveAll').addEventListener('click', saveAll);
 
+  // Keep the TV/display awake while the wall is showing.
+  let wakeLock = null;
+  async function keepAwake() {
+    if (!('wakeLock' in navigator) || document.visibilityState !== 'visible' || (wakeLock && !wakeLock.released)) return;
+    try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { console.warn('Wake lock:', e.message); }
+  }
+  keepAwake();
+  document.addEventListener('visibilitychange', keepAwake);
+  addEventListener('pointerdown', keepAwake); addEventListener('keydown', keepAwake);
+  setInterval(keepAwake, 60000);
+
   const manageBtn = document.getElementById('manage'), manageList = document.getElementById('manageList');
   async function renderManage() {
     const all = (await listButterflies()).slice().reverse();
