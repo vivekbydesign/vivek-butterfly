@@ -40,7 +40,7 @@
 <div class="caption" id="caption"></div>
 <div class="qr" id="qr">
   <img id="qrimg" alt="">
-  <div><b>Release your butterfly</b><span>Colour one in, then scan<br>to bring it to life here.</span></div>
+  <div><b>Bring your butterfly to life</b><span>Colour one in, then scan<br>to watch it fly here.</span></div>
 </div>
 <div class="menu-hotspot" id="menuHotspot">
   <button class="menu-btn" id="menuBtn" aria-label="Settings" aria-expanded="false" aria-controls="menu">
@@ -59,13 +59,13 @@
 <div class="hint" id="hint">⋯ or M settings · F fullscreen · Q QR · A ambient butterflies · C webcam · T test arrival · V camera preview · R clear butterflies</div>
 <video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
 <script type="module">
-  import { BodyTracker } from './body.js?v=20261121d';
-  import { STATIC, qrSrc, listButterflies, savedButterflies, clearButterflies, listen, uploadUrl } from './net.js?v=20261121d';
+  import { BodyTracker } from './body.js?v=20261121e';
+  import { STATIC, qrSrc, listButterflies, savedButterflies, clearButterflies, listen, uploadUrl } from './net.js?v=20261121e';
   qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
-  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121d';
+  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121e';
   let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
   loadTextures().then((n) => { if (n) gardenKey = ''; });
-  import('./art.js?v=20261121d').then(({ importArt }) => {
+  import('./art.js?v=20261121e').then(({ importArt }) => {
     const dir = document.getElementById('artDir');
     document.getElementById('loadArt').onclick = () => dir.click();
     dir.onchange = async () => {
@@ -389,9 +389,9 @@
     g.restore();
     if (b.name && b !== hero) {
       const lb = b.label || (b.label = nameLabel(b.name));
-      const fs = Math.max(11, sp.h * sc * 0.11), w = (lb.width / lb.height) * fs * 1.6;
+      const fs = Math.max(8, sp.h * sc * 0.065), w = (lb.width / lb.height) * fs * 1.6;
       g.save(); g.globalAlpha = depthFade * alphaMul;
-      g.drawImage(lb, sx - w / 2, sy + bob * sc + sp.h * sc * 0.44, w, fs * 1.6);
+      g.drawImage(lb, sx - w / 2, sy + bob * sc + sp.h * sc * 0.5, w, fs * 1.6);
       g.restore();
     }
   }
@@ -399,10 +399,10 @@
   function nameLabel(text) {
     const fs = 96, font = `600 ${fs}px Futura, "Avenir Next", "Arial Rounded MT Bold", Arial, sans-serif`;
     const c = document.createElement('canvas'), g = c.getContext('2d');
-    g.font = font; c.width = Math.ceil(g.measureText(text).width + fs * 0.6); c.height = Math.ceil(fs * 1.6);
-    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
-    g.lineWidth = fs * 0.16; g.strokeStyle = 'rgba(255,253,248,.92)'; g.strokeText(text, c.width / 2, c.height / 2);
-    g.fillStyle = '#3a2614'; g.fillText(text, c.width / 2, c.height / 2);
+    g.font = font; c.width = Math.ceil(g.measureText(text).width + fs * 1.1); c.height = Math.ceil(fs * 1.6);
+    g.fillStyle = 'rgba(30,20,12,.62)'; g.beginPath(); g.roundRect(0, 0, c.width, c.height, c.height / 2); g.fill();
+    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#fff'; g.fillText(text, c.width / 2, c.height / 2 + fs * 0.04);
     return c;
   }
 
@@ -482,7 +482,6 @@
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
       b.roll = lerp(b.roll, Math.max(-0.7, Math.min(0.7, b.vx * 0.0016 + Math.sin(time + b.wob) * 0.12)), 0.08);
       b.pitch = 0.6 + 0.4 * Math.cos(b.wob + time * 0.4);
-      if (b.trail) { b.trail -= dt; if (Math.random() < 0.6) burst(b.x, b.y, b.z, 1, 30, rand(290, 340)); }
     }
     if (pointer.active === 2) pointer.active = 1;
 
@@ -518,7 +517,7 @@
         b.glow = 0.5 * (1 - tt);
         b.roll = lerp(b.roll, 0.25, 0.03);
       }
-      if (a > 8.8) { b.glow = 0; b.trail = 14; b.sat = 1; hero = null; }
+      if (a > 8.8) { b.glow = 0; b.sat = 1; hero = null; }
     }
 
     // Draw

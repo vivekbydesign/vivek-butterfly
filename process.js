@@ -1,5 +1,5 @@
-import { SHEET, ART, WING, fillSilhouette, templateSvg } from './shape.js?v=20261121d';
-import { STATIC } from './net.js?v=20261121d';
+import { SHEET, ART, WING, fillSilhouette, templateSvg } from './shape.js?v=20261121e';
+import { STATIC } from './net.js?v=20261121e';
 
 const PX = 4; // output pixels per template unit
 
@@ -64,7 +64,7 @@ async function fromTemplate(full) {
     if (ratio < 2.4 && fill > 0.5 && fill < 1.2) cands.push({ x: mx, y: my, n, ring: fill < 0.84 });
   }
   cands.sort((a, b) => b.n - a.n);
-  const pool = cands.slice(0, 16);
+  const pool = cands.slice(0, 20);
 
   // 2. Best four: convex, similar size, marker size consistent with frame size, exactly one ring preferred.
   const quads = [];
@@ -83,26 +83,48 @@ async function fromTemplate(full) {
     if (!convex || area <= 0) continue;
     const rel = Math.sqrt(ns.reduce((s, v) => s + v, 0) / 4) / Math.sqrt(area);
     if (rel < 0.042 || rel > 0.11) continue; // printed: 14-unit squares on a 224x190 frame = 0.068
-    const rings = q.filter((m) => m.ring).length;
-    const score = area * (rings === 1 ? 4 : 1);
-    quads.push({ q, score });
+    quads.push(q);
   }
   if (!quads.length) throw new Error('corner squares not found');
-  quads.sort((a, b) => b.score - a.score);
   const pts = await templatePoints();
   const ridge = ridgeMap(lum, W, H);
-  // Try the most plausible square sets in turn; keep the first whose printed outline really is under the template.
-  let Hm = null, fit = null, lastErr = null;
-  for (const { q: best } of quads.slice(0, 12)) {
-    try { ({ Hm, fit } = alignQuad(best)); break; } catch (e) { lastErr = e; }
+  // Fraction of template outline points that land on dark drawn lines (vs. the same shifted aside).
+  const lineHits = (Hm, fit, sx, sy) => { let n = 0;
+    for (let i = 0; i < pts.length; i += 2) {
+      const [u, v] = apply(Hm, pts[i] * fit.s + fit.dx, pts[i + 1] * fit.s + fit.dy);
+      let mn = 255; for (const [ox, oy] of [[0, 0], [1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]]) mn = Math.min(mn, sampleF(lum, W, H, u + sx + ox, v + sy + oy));
+      if (mn < 120) n++;
+    }
+    return n / (pts.length / 2); };
+  const outlineMatch = (Hm, fit) => { const on = lineHits(Hm, fit, 0, 0), off = (lineHits(Hm, fit, 7, 0) + lineHits(Hm, fit, -7, 0) + lineHits(Hm, fit, 0, 7) + lineHits(Hm, fit, 0, -7)) / 4; return { on, off }; };
+  // Every plausible square set and orientation is ranked by how well the printed butterfly lines up with it.
+  const tries = [];
+  for (const q of quads) {
+    const ringAt = q.findIndex((m) => m.ring), starts = q.filter((m) => m.ring).length === 1 ? [ringAt] : [0, 1, 2, 3];
+    for (const st of starts) {
+      const Hm = homography(SHEET.markers, [0, 1, 2, 3].map((i) => [q[(st + i) % 4].x, q[(st + i) % 4].y]));
+      if (!Hm || !Hm.every(Number.isFinite)) continue;
+      const { on, off } = outlineMatch(Hm, { dx: 0, dy: 0, s: 1 });
+      tries.push({ Hm, quick: on - off, ring: st === ringAt && q.filter((m) => m.ring).length === 1, area: quadArea(q) });
+    }
+  }
+  // Best outline overlap first, then the largest sets that include the ringed corner (curled paper scores low before refinement).
+  const byQuick = [...tries].sort((a, b) => b.quick - a.quick).slice(0, 5);
+  const byRing = tries.filter((t) => t.ring).sort((a, b) => b.area - a.area).slice(0, 5);
+  const order = [...new Set([...byQuick, ...byRing])];
+  // Black printed ink only (crayon strokes also make dark ridges, but they are coloured).
+  const inkMap = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const r = norm[i * 3], g = norm[i * 3 + 1], b = norm[i * 3 + 2], ch = Math.max(r, g, b) - Math.min(r, g, b);
+    inkMap[i] = Math.max(0, 150 - lum[i]) * Math.max(0, Math.min(1, (60 - ch) / 30)); }
+  const inkWide = boxBlur(inkMap, W, H, 4), inkMid = boxBlur(inkMap, W, H, 1);
+  let Hm = null, fit = null, lastErr = new Error('corner squares not found');
+  for (const t of order) {
+    try { ({ Hm, fit } = alignQuad(t.Hm)); break; } catch (e) { lastErr = e; }
   }
   if (!Hm) throw lastErr;
 
-  function alignQuad(best) {
-  let start = best.findIndex((m) => m.ring);
-  if (best.filter((m) => m.ring).length !== 1) start = best.reduce((bi, m, i, arr) => (m.x + m.y < arr[bi].x + arr[bi].y ? i : bi), 0);
-  const ordered = [0, 1, 2, 3].map((i) => best[(start + i) % 4]);
-  const Hm = homography(SHEET.markers, ordered.map((m) => [m.x, m.y]));
+  function alignQuad(Hm) {
+  Hm = bendToOutline(Hm);
 
   // 3. Fine-align template lines to the drawn outline (paper curl, print scaling).
   const score = (dx, dy, s) => {
@@ -126,19 +148,31 @@ async function fromTemplate(full) {
   search(1, 0.25, 0, 1);
   if (fitScore < base * 1.04) fit = { dx: 0, dy: 0, s: 1 };
   // Reject false square matches (textures, other printouts): the template outline must land on real drawn lines.
-  const lineHits = (sx, sy) => { let n = 0;
-    for (let i = 0; i < pts.length; i += 2) {
-      const [u, v] = apply(Hm, pts[i] * fit.s + fit.dx, pts[i + 1] * fit.s + fit.dy);
-      let mn = 255; for (const [ox, oy] of [[0, 0], [1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]]) mn = Math.min(mn, sampleF(lum, W, H, u + sx + ox, v + sy + oy));
-      if (mn < 120) n++;
-    }
-    return n / (pts.length / 2); };
-  const onLine = lineHits(0, 0), off = (lineHits(7, 0) + lineHits(-7, 0) + lineHits(0, 7) + lineHits(0, -7)) / 4;
+  const { on: onLine, off } = outlineMatch(Hm, fit);
   if (onLine < 0.6 || onLine - off < 0.3) throw new Error(`outline mismatch (on ${onLine.toFixed(2)}, off ${off.toFixed(2)})`);
   return { Hm, fit };
   }
 
   // 4. Warp into template space at full resolution (2x2 supersampled).
+  // Paper held in a hand or lap curls: nudge each corner so the template outline locks onto the drawn one.
+  function bendToOutline(H0) {
+    const corners = SHEET.markers.map(([x, y]) => apply(H0, x, y)), orig = corners.map((c) => [...c]);
+    const diag = Math.hypot(corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]), lim = diag * 0.08;
+    const sub = []; for (let i = 0; i < pts.length; i += 6) sub.push(pts[i], pts[i + 1]);
+    const evalC = (cs, map) => { const h = homography(SHEET.markers, cs); if (!h.every(Number.isFinite)) return -1;
+      let t = 0; for (let i = 0; i < sub.length; i += 2) { const [u, v] = apply(h, sub[i], sub[i + 1]); t += sampleF(map, W, H, u, v); } return t; };
+    for (const [map, steps] of [[inkWide, [diag * 0.03, diag * 0.015, diag * 0.008]], [inkMid, [diag * 0.006, diag * 0.003, diag * 0.0015]]]) {
+      let best = evalC(corners, map);
+      for (const step of steps) for (let pass = 0, moved = true; pass < 4 && moved; pass++) { moved = false;
+        for (let k = 0; k < 4; k++) for (let ax = 0; ax < 2; ax++) for (const sg of [-1, 1]) {
+          const old = corners[k][ax]; corners[k][ax] = old + sg * step;
+          const v = Math.abs(corners[k][ax] - orig[k][ax]) <= lim ? evalC(corners, map) : -1;
+          if (v > best) { best = v; moved = true; } else corners[k][ax] = old;
+        } }
+    }
+    return homography(SHEET.markers, corners);
+  }
+
   const k = full.width / W, src = pixels(full), SW = full.width, SH = full.height, sd = src.data;
   const OW = ART.w * PX, OH = ART.h * PX, out = new Float32Array(OW * OH * 3);
   for (let j = 0; j < OH; j++) for (let i = 0; i < OW; i++) {
@@ -159,12 +193,23 @@ async function fromTemplate(full) {
   // 6. Compose: the photographed drawing as-is (including its own outline), cut out along the outline's outer edge.
   const c = document.createElement('canvas'); c.width = OW; c.height = OH;
   const cg = c.getContext('2d'), id = cg.createImageData(OW, OH);
+  // Curled paper: where the drawn outline sits inside the template edge, peel the paper between them
+  // (flood in from outside through plain white paper only, near the edge so a gap in the line can't eat a wing).
+  const ON = OW * OH, isInk = new Uint8Array(ON), paper = new Uint8Array(ON), dist = new Int16Array(ON).fill(-1), st = [];
+  for (let i = 0; i < ON; i++) { const r = out[i * 3], g = out[i * 3 + 1], b = out[i * 3 + 2], l = (r + g + b) / 3, ch = Math.max(r, g, b) - Math.min(r, g, b);
+    isInk[i] = l < 150 && ch < 60 ? 1 : 0; paper[i] = l > 185 && ch < 30 ? 1 : 0; }
+  const inkD = dilate(isInk, OW, OH, 2), DEPTH = Math.round(OW * 0.04);
+  for (let i = 0; i < ON; i++) if (id0[i * 4 + 3] < 128) { dist[i] = 0; st.push(i); }
+  for (let h = 0; h < st.length; h++) { const i = st[h], x = i % OW;
+    if (dist[i] >= DEPTH) continue;
+    for (const j of [x > 0 ? i - 1 : -1, x < OW - 1 ? i + 1 : -1, i - OW, i + OW]) if (j >= 0 && j < ON && dist[j] < 0 && !inkD[j] && paper[j]) { dist[j] = dist[i] + 1; st.push(j); } }
   for (let i = 0; i < OW * OH; i++) {
     const r = out[i * 3], g = out[i * 3 + 1], b = out[i * 3 + 2], l = (r + g + b) / 3;
     const chroma = Math.max(r, g, b) - Math.min(r, g, b);
     const ink = Math.max(0, Math.min(1, (225 - l) / 110)) * Math.max(0, Math.min(1, (90 - chroma) / 40));
     id.data[i * 4] = r; id.data[i * 4 + 1] = g; id.data[i * 4 + 2] = b;
-    id.data[i * 4 + 3] = Math.max(id0[i * 4 + 3], (bd[i * 4 + 3] / 255) * ink * 255);
+    const body = dist[i] > 0 ? 0 : id0[i * 4 + 3];
+    id.data[i * 4 + 3] = Math.max(body, (bd[i * 4 + 3] / 255) * ink * 255);
   }
   cg.putImageData(id, 0, 0);
   return { canvas: c, cx: OW / 2 };
@@ -311,6 +356,8 @@ function ridgeMap(lum, W, H) {
   for (let i = 0; i < W * H; i++) out[i] = Math.max(0, blur[i] - lum[i]);
   return out;
 }
+
+const quadArea = (q) => Math.abs(q.reduce((s, m, i) => { const n = q[(i + 1) % 4]; return s + m.x * n.y - n.x * m.y; }, 0)) / 2;
 
 function homography(from, to) {
   const A = [], B = [];

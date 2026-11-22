@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07060a">
-<title>Release your butterfly</title>
+<title>Bring your butterfly to life</title>
 <style>
   :root { --pink: #ff8fc8; --ink: #f6eef4; --mute: #a99aa6; }
   * { box-sizing: border-box; }
@@ -39,7 +39,7 @@
 <body>
 <main>
   <section id="s-capture">
-    <h1>Release your butterfly</h1>
+    <h1>Bring your butterfly to life</h1>
     <p>Lay your sheet flat in good light. Include all four black corner squares so only the butterfly is cut out.</p>
   </section>
   <section id="s-preview" class="hidden">
@@ -74,9 +74,9 @@
   </div>
 </main>
 <script type="module">
-  import { extractButterfly } from './process.js?v=20261121d';
-  import { templateSvg } from './shape.js?v=20261121d';
-  import { sendButterfly } from './net.js?v=20261121d';
+  import { extractButterfly } from './process.js?v=20261121e';
+  import { templateSvg } from './shape.js?v=20261121e';
+  import { sendButterfly } from './net.js?v=20261121e';
   const $ = (id) => document.getElementById(id);
   $('ghost').innerHTML = templateSvg({ stroke: '#ff8fc8', width: 1.2 });
   let result = null;
