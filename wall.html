@@ -31,6 +31,16 @@
   .menu input:checked::after { transform: translateX(16px); }
   .menu-action { display: flex; justify-content: space-between; width: 100%; margin-top: 4px; padding: 10px 12px; border: 0; border-top: 1px solid rgba(255,255,255,.08); border-radius: 0 0 10px 10px; background: none; color: #ff9cc8; font: inherit; text-align: left; cursor: pointer; }
   .menu-action:hover { background: rgba(255,120,180,.1); }
+  .menu-list { max-height: 42vh; overflow-y: auto; padding: 4px 0; }
+  .menu-list[hidden] { display: none; }
+  .menu-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 10px; }
+  .menu-row:hover { background: rgba(255,255,255,.06); }
+  .menu-row img { width: 44px; height: 33px; object-fit: contain; background: rgba(255,255,255,.9); border-radius: 6px; flex: none; }
+  .menu-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menu-row span i { color: #a8909f; font-style: normal; }
+  .menu-row button { border: 0; border-radius: 8px; padding: 6px 10px; background: rgba(255,120,180,.14); color: #ff9cc8; font: inherit; cursor: pointer; }
+  .menu-row button:hover { background: rgba(255,120,180,.28); }
+  .menu-empty { padding: 8px 12px; color: #a8909f; }
   body.show-cursor { cursor: default; }
   .hint { position: fixed; left: 16px; bottom: 12px; color: rgba(255,255,255,.25); font-size: 12px; transition: opacity 1s; }
 </style>
@@ -54,18 +64,20 @@
   <button class="menu-action" id="loadArt" style="color:#f7eaf2;border-radius:0">Load garden art…<kbd>local folder</kbd></button>
   <input type="file" id="artDir" webkitdirectory multiple hidden>
   <button class="menu-action" id="saveAll" style="color:#f7eaf2;border-radius:0">Save all butterflies…<kbd>PNG + name</kbd></button>
+  <button class="menu-action" id="manage" style="color:#f7eaf2;border-radius:0" aria-expanded="false">Remove a butterfly…<kbd>tests, mistakes</kbd></button>
+  <div class="menu-list" id="manageList" hidden></div>
   <button class="menu-action" id="clearAll">Clear butterflies<kbd>R</kbd></button>
 </div>
 <div class="hint" id="hint">⋯ or M settings · F fullscreen · Q QR · A ambient butterflies · C webcam · T test arrival · V camera preview · R clear butterflies</div>
 <video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
 <script type="module">
-  import { BodyTracker } from './body.js?v=20261121e';
-  import { STATIC, qrSrc, listButterflies, savedButterflies, clearButterflies, listen, uploadUrl } from './net.js?v=20261121e';
+  import { BodyTracker } from './body.js?v=20261121f';
+  import { STATIC, qrSrc, listButterflies, savedButterflies, removeButterfly, clearButterflies, listen, uploadUrl } from './net.js?v=20261121f';
   qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
-  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121e';
+  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121f';
   let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
   loadTextures().then((n) => { if (n) gardenKey = ''; });
-  import('./art.js?v=20261121e').then(({ importArt }) => {
+  import('./art.js?v=20261121f').then(({ importArt }) => {
     const dir = document.getElementById('artDir');
     document.getElementById('loadArt').onclick = () => dir.click();
     dir.onchange = async () => {
@@ -247,6 +259,26 @@
     }
   }
   document.getElementById('saveAll').addEventListener('click', saveAll);
+
+  const manageBtn = document.getElementById('manage'), manageList = document.getElementById('manageList');
+  async function renderManage() {
+    const all = (await listButterflies()).slice().reverse();
+    manageList.replaceChildren();
+    if (!all.length) { const e = document.createElement('div'); e.className = 'menu-empty'; e.textContent = 'No butterflies on the wall.'; manageList.append(e); return; }
+    for (const x of all) {
+      const row = document.createElement('div'); row.className = 'menu-row';
+      const img = document.createElement('img'); img.src = x.url; img.alt = '';
+      const label = document.createElement('span'); label.textContent = x.name || ''; if (!x.name) label.innerHTML = '<i>No name</i>';
+      const del = document.createElement('button'); del.textContent = 'Remove'; del.setAttribute('aria-label', `Remove ${x.name || 'unnamed'} butterfly`);
+      del.onclick = async () => { await removeButterfly(x.id); dropFromWall(x.id); row.remove(); if (!manageList.children.length) renderManage(); };
+      row.append(img, label, del); manageList.append(row);
+    }
+  }
+  function dropFromWall(id) {
+    for (let i = flock.length - 1; i >= 0; i--) if (flock[i].id === id) { const b = flock[i]; takeOff(b); if (hero === b) { hero = null; caption.classList.remove('on'); } flock.splice(i, 1); }
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i].item.id === id) queue.splice(i, 1);
+  }
+  manageBtn.addEventListener('click', () => { manageList.hidden = !manageList.hidden; manageBtn.setAttribute('aria-expanded', !manageList.hidden); if (!manageList.hidden) renderManage(); });
   let cursorTimer;
   addEventListener('pointermove', () => { document.body.classList.add('show-cursor'); clearTimeout(cursorTimer); cursorTimer = setTimeout(() => document.body.classList.remove('show-cursor'), 2500); });
   // Video pixel -> screen px (mirrored, object-fit: cover)

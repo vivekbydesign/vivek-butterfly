@@ -47,6 +47,11 @@ export async function savedButterflies() {
   const all = (await tx('readonly', (s) => s.getAll(), 'keep')) || [];
   return all.sort((a, b) => a.created - b.created).map((x) => ({ ...x, url: x.image }));
 }
+// Delete one butterfly from the wall and the archive (for tests and mistakes).
+export async function removeButterfly(id) {
+  if (!STATIC) return fetch('./api/butterflies/' + encodeURIComponent(id), { method: 'DELETE' });
+  await tx('readwrite', (s) => s.delete(id)); await tx('readwrite', (s) => s.delete(id), 'keep');
+}
 export async function clearButterflies() {
   if (!STATIC) return fetch('./api/butterflies', { method: 'DELETE' });
   await tx('readwrite', (s) => s.clear());
