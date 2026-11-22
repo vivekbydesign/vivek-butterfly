@@ -1,5 +1,5 @@
 // Webcam body tracking: white silhouette + perch points (head, shoulders, hands) in video pixel space.
-import { STATIC } from './net.js';
+import { STATIC } from './net.js?v=20261121c';
 const MP = STATIC ? 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2' : new URL('./vendor/mediapipe', location.href).href;
 const { FilesetResolver, PoseLandmarker } = await import(`${MP}/vision_bundle.mjs`);
 

@@ -39,8 +39,8 @@
   </footer>
 </div>
 <script type="module">
-  import { sheetSvg } from './shape.js?v=2';
-  import { qrSrc } from './net.js';
+  import { sheetSvg } from './shape.js?v=20261121c';
+  import { qrSrc } from './net.js?v=20261121c';
   qrSrc().then((s) => { document.getElementById('qr').src = s; });
   document.getElementById('art').innerHTML = sheetSvg({ width: 1.25 });
 </script>
