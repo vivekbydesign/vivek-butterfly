@@ -5,6 +5,8 @@
 export const STATIC = location.hostname.endsWith('github.io') || new URLSearchParams(location.search).has('p2p');
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/+esm';
 const QRLIB = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm';
+const RELAY = 'https://ntfy.sh';
+const relayTopic = (wall) => 'bw-' + wall;
 
 export function wallId() {
   const fromUrl = new URLSearchParams(location.search).get('wall');
@@ -64,15 +66,31 @@ export function listen(add, reset) {
     es.addEventListener('reset', reset);
     return;
   }
+  const receive = async (image, name) => {
+    const item = { id: crypto.randomUUID(), image, name: String(name || '').slice(0, 40), created: Date.now() };
+    try { await tx('readwrite', (s) => s.put(item)); await tx('readwrite', (s) => s.put(item), 'keep'); } catch (e) { console.warn('Could not save butterfly', e); }
+    add({ ...item, url: item.image });
+  };
+  // Relay path: works when phones aren't on the TV's Wi-Fi.
+  const seen = new Set();
+  const relay = new EventSource(`${RELAY}/${relayTopic(wallId())}/sse`);
+  relay.onmessage = async (e) => {
+    try {
+      const m = JSON.parse(e.data), a = m.attachment;
+      if (m.event !== 'message' || !a || seen.has(m.id) || a.type !== 'image/png' || a.size > 9e6) return;
+      seen.add(m.id);
+      const blob = await (await fetch(a.url)).blob();
+      const image = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+      await receive(image, String(m.message || '').startsWith('n:') ? m.message.slice(2) : '');
+    } catch (err) { console.warn('Relay butterfly failed', err); }
+  };
   import(PEERJS).then(({ Peer }) => {
     const open = () => {
       const peer = new Peer(wallId());
       peer.on('open', (id) => console.info('Wall online as', id, '→', uploadUrl()));
       peer.on('connection', (conn) => conn.on('data', async (msg) => {
         if (!msg || typeof msg.image !== 'string' || !msg.image.startsWith('data:image/png;base64,') || msg.image.length > 12e6) return conn.send({ ok: false });
-        const item = { id: crypto.randomUUID(), image: msg.image, name: String(msg.name || '').slice(0, 40), created: Date.now() };
-        try { await tx('readwrite', (s) => s.put(item)); await tx('readwrite', (s) => s.put(item), 'keep'); } catch (e) { console.warn('Could not save butterfly', e); }
-        add({ ...item, url: item.image });
+        await receive(msg.image, msg.name);
         conn.send({ ok: true });
       }));
       addEventListener('pagehide', () => peer.destroy(), { once: true });
@@ -94,6 +112,7 @@ export async function sendButterfly(image, name) {
   }
   const wall = new URLSearchParams(location.search).get('wall');
   if (!wall) throw new Error('Scan the QR code on the garden screen to send your butterfly.');
+  try { return await sendRelay(wall, image, name); } catch (e) { console.warn('Relay send failed, trying direct', e); }
   const { Peer } = await import(PEERJS);
   // The wall may be briefly offline (screen waking, page reloading): retry a few times before giving up.
   let last;
@@ -103,6 +122,14 @@ export async function sendButterfly(image, name) {
     catch (e) { last = e; if (e.final) break; }
   }
   throw last;
+}
+async function sendRelay(wall, image, name) {
+  const blob = await (await fetch(image)).blob();
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 45000);
+  try {
+    const res = await fetch(`${RELAY}/${relayTopic(wall)}?filename=butterfly.png&message=${encodeURIComponent('n:' + String(name || '').slice(0, 40))}`, { method: 'PUT', body: blob, signal: ctl.signal });
+    if (!res.ok) throw new Error('Relay ' + res.status);
+  } finally { clearTimeout(t); }
 }
 async function sendOnce(Peer, wall, image, name) {
   const peer = new Peer();

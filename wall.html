@@ -71,13 +71,13 @@
 <div class="hint" id="hint">⋯ or M settings · F fullscreen · Q QR · A ambient butterflies · C webcam · T test arrival · V camera preview · R clear butterflies</div>
 <video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
 <script type="module">
-  import { BodyTracker } from './body.js?v=20261121h';
-  import { STATIC, qrSrc, listButterflies, savedButterflies, removeButterfly, clearButterflies, listen, uploadUrl } from './net.js?v=20261121h';
+  import { BodyTracker } from './body.js?v=20261122a';
+  import { STATIC, qrSrc, listButterflies, savedButterflies, removeButterfly, clearButterflies, listen, uploadUrl } from './net.js?v=20261122a';
   qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
-  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121h';
+  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261122a';
   let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
   loadTextures().then((n) => { if (n) gardenKey = ''; });
-  import('./art.js?v=20261121h').then(({ importArt }) => {
+  import('./art.js?v=20261122a').then(({ importArt }) => {
     const dir = document.getElementById('artDir');
     document.getElementById('loadArt').onclick = () => dir.click();
     dir.onchange = async () => {
