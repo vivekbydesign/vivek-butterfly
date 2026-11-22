@@ -9,9 +9,8 @@ const QRLIB = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm';
 export function wallId() {
   const fromUrl = new URLSearchParams(location.search).get('wall');
   if (fromUrl) return fromUrl;
-  let id = localStorage.getItem('rg-wall');
-  if (!id) { id = 'rishis-garden-' + crypto.randomUUID().slice(0, 8); localStorage.setItem('rg-wall', id); }
-  return id;
+  // Fixed so the printed sheets' QR codes always reach the garden, on any TV/browser.
+  return 'rishis-garden-b6a66151';
 }
 export const uploadUrl = () => new URL(`upload.html?wall=${wallId()}${location.hostname.endsWith('github.io') ? '' : '&p2p'}`, location.href).href;
 export async function qrSrc() {
@@ -77,7 +76,9 @@ export function listen(add, reset) {
         conn.send({ ok: true });
       }));
       addEventListener('pagehide', () => peer.destroy(), { once: true });
-      peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
+      peer.on('disconnected', () => { if (!peer.destroyed) setTimeout(() => !peer.destroyed && peer.disconnected && peer.reconnect(), 1000); });
+      const wake = () => { if (!peer.destroyed && peer.disconnected) peer.reconnect(); };
+      document.addEventListener('visibilitychange', wake); addEventListener('online', wake); addEventListener('focus', wake); setInterval(wake, 20000);
       peer.on('error', (e) => { console.warn('Wall connection:', e.type); if (['network', 'server-error', 'socket-error', 'socket-closed', 'unavailable-id'].includes(e.type)) { peer.destroy(); setTimeout(open, 5000); } });
     };
     open();
@@ -94,16 +95,26 @@ export async function sendButterfly(image, name) {
   const wall = new URLSearchParams(location.search).get('wall');
   if (!wall) throw new Error('Scan the QR code on the garden screen to send your butterfly.');
   const { Peer } = await import(PEERJS);
+  // The wall may be briefly offline (screen waking, page reloading): retry a few times before giving up.
+  let last;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 4000));
+    try { return await sendOnce(Peer, wall, image, name); }
+    catch (e) { last = e; if (e.final) break; }
+  }
+  throw last;
+}
+async function sendOnce(Peer, wall, image, name) {
   const peer = new Peer();
   try {
     await new Promise((res, rej) => {
-      const t = setTimeout(() => rej(new Error('The garden isn’t answering. Is the screen switched on?')), 25000);
+      const t = setTimeout(() => rej(new Error('The garden isn’t answering. Is the screen switched on?')), 20000);
       const fail = (e) => { clearTimeout(t); rej(e); };
-      peer.on('error', (e) => fail(new Error(e.type === 'peer-unavailable' ? 'The garden screen isn’t online right now.' : e.message)));
+      peer.on('error', (e) => fail(new Error(e.type === 'peer-unavailable' ? 'The garden screen isn’t online right now. Check the TV is on and the garden page is open.' : e.message)));
       peer.on('open', () => {
         const conn = peer.connect(wall, { reliable: true });
         conn.on('open', () => conn.send({ image, name }));
-        conn.on('data', (m) => { clearTimeout(t); m?.ok ? res() : rej(new Error('The garden couldn’t take that picture.')); });
+        conn.on('data', (m) => { clearTimeout(t); if (m?.ok) res(); else { const e = new Error('The garden couldn’t take that picture.'); e.final = true; rej(e); } });
         conn.on('error', fail);
       });
     });

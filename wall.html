@@ -8,7 +8,7 @@
   html, body { margin: 0; height: 100%; background: #fdfcf9; overflow: hidden; cursor: none; font-family: -apple-system, "SF Pro Display", "Segoe UI", sans-serif; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   .qr { position: fixed; left: 3vw; top: 4vh; display: flex; align-items: center; gap: clamp(10px, 1.7vmin, 18px); padding: clamp(8px, 1.3vmin, 14px) clamp(12px, 1.85vmin, 20px) clamp(8px, 1.3vmin, 14px) clamp(8px, 1.3vmin, 14px); border-radius: clamp(12px, 1.85vmin, 20px); background: rgba(255,251,242,.92); border: 0; color: #2b2118; transition: opacity .6s; box-shadow: 2px 4px 14px rgba(60,40,20,.25); }
-  .qr img { width: clamp(60px, 10.4vmin, 112px); height: clamp(60px, 10.4vmin, 112px); border-radius: clamp(6px, .93vmin, 10px); background: #fff; padding: clamp(3px, .56vmin, 6px); box-sizing: border-box; }
+  .qr img { width: clamp(80px, 17vmin, 220px); height: clamp(80px, 17vmin, 220px); border-radius: clamp(6px, .93vmin, 10px); background: #fff; padding: clamp(3px, .56vmin, 6px); box-sizing: border-box; }
   .qr b { display: block; font-size: clamp(13px, 1.85vmin, 20px); font-weight: 600; margin-bottom: 4px; }
   .qr span { font-size: clamp(11px, 1.3vmin, 14px); color: #6b5a48; line-height: 1.4; }
   .qr.off { opacity: 0; }
@@ -71,13 +71,13 @@
 <div class="hint" id="hint">⋯ or M settings · F fullscreen · Q QR · A ambient butterflies · C webcam · T test arrival · V camera preview · R clear butterflies</div>
 <video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
 <script type="module">
-  import { BodyTracker } from './body.js?v=20261121f';
-  import { STATIC, qrSrc, listButterflies, savedButterflies, removeButterfly, clearButterflies, listen, uploadUrl } from './net.js?v=20261121f';
+  import { BodyTracker } from './body.js?v=20261121h';
+  import { STATIC, qrSrc, listButterflies, savedButterflies, removeButterfly, clearButterflies, listen, uploadUrl } from './net.js?v=20261121h';
   qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
-  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121f';
+  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121h';
   let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
   loadTextures().then((n) => { if (n) gardenKey = ''; });
-  import('./art.js?v=20261121f').then(({ importArt }) => {
+  import('./art.js?v=20261121h').then(({ importArt }) => {
     const dir = document.getElementById('artDir');
     document.getElementById('loadArt').onclick = () => dir.click();
     dir.onchange = async () => {
