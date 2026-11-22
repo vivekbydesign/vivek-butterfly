@@ -7,10 +7,10 @@
 <style>
   html, body { margin: 0; height: 100%; background: #fdfcf9; overflow: hidden; cursor: none; font-family: -apple-system, "SF Pro Display", "Segoe UI", sans-serif; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-  .qr { position: fixed; right: 3vw; bottom: 4vh; display: flex; align-items: center; gap: 18px; padding: 14px 20px 14px 14px; border-radius: 20px; background: rgba(255,251,242,.92); border: 0; color: #2b2118; transition: opacity .6s; box-shadow: 2px 4px 14px rgba(60,40,20,.25); }
-  .qr img { width: 112px; height: 112px; border-radius: 10px; background: #fff; padding: 6px; box-sizing: border-box; }
-  .qr b { display: block; font-size: 20px; font-weight: 600; margin-bottom: 4px; }
-  .qr span { font-size: 14px; color: #6b5a48; line-height: 1.4; }
+  .qr { position: fixed; right: 3vw; bottom: 4vh; display: flex; align-items: center; gap: clamp(10px, 1.7vmin, 18px); padding: clamp(8px, 1.3vmin, 14px) clamp(12px, 1.85vmin, 20px) clamp(8px, 1.3vmin, 14px) clamp(8px, 1.3vmin, 14px); border-radius: clamp(12px, 1.85vmin, 20px); background: rgba(255,251,242,.92); border: 0; color: #2b2118; transition: opacity .6s; box-shadow: 2px 4px 14px rgba(60,40,20,.25); }
+  .qr img { width: clamp(60px, 10.4vmin, 112px); height: clamp(60px, 10.4vmin, 112px); border-radius: clamp(6px, .93vmin, 10px); background: #fff; padding: clamp(3px, .56vmin, 6px); box-sizing: border-box; }
+  .qr b { display: block; font-size: clamp(13px, 1.85vmin, 20px); font-weight: 600; margin-bottom: 4px; }
+  .qr span { font-size: clamp(11px, 1.3vmin, 14px); color: #6b5a48; line-height: 1.4; }
   .qr.off { opacity: 0; }
   .caption { position: fixed; left: 50%; top: 79%; transform: translate(-50%, 10px); color: #fff; -webkit-text-stroke: 0; font-weight: 700; font-size: clamp(22px, 2.6vw, 44px); font-weight: 500; letter-spacing: .01em; opacity: 0; transition: opacity 1s, transform 1s; text-shadow: 0 2px 0 rgba(40,25,10,.35), 0 0 24px rgba(40,25,10,.35); pointer-events: none; white-space: nowrap; }
   .caption.on { opacity: 1; transform: translate(-50%, 0); }

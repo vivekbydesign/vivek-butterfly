@@ -345,17 +345,15 @@ function caterpillarSprite({ head, seg }, w, h) {
     segs.push(c);
   }
   const hs = (R * 1.3 * 1.25) / 66, gap = R * 1.2;
-  const margin = Math.min(w / 2, gap * n / 2 + R * 1.6), distance = w - margin * 2;
-  const travelTime = Math.max(1, distance / (w * 0.012)), turnTime = 0.9, legTime = travelTime + turnTime;
+  // Crawls fully off the right edge, then re-enters from the left.
+  const margin = gap * n / 2 + R * 1.6, distance = w + margin * 2;
+  const travelTime = Math.max(1, distance / (w * 0.012));
   const foot = (g, x, y) => { g.fillStyle = '#7a3f8f'; g.beginPath(); g.ellipse(x, y, R * 0.13, R * 0.24, 0, 0, TAU); g.fill(); };
   return {
     draw(g, t) {
-      const phase = (t + travelTime * 0.45) % (legTime * 2), returning = phase >= legTime;
-      const leg = phase % legTime, progress = Math.min(1, leg / travelTime);
-      const cx = margin + distance * (returning ? 1 - progress : progress);
-      const facing = (returning ? -1 : 1) * Math.cos(Math.max(0, leg - travelTime) / turnTime * Math.PI);
+      const cx = -margin + distance * (((t / travelTime) + 0.45) % 1);
       const hx = gap * n / 2, base = h * 0.925;
-      g.save(); g.translate(cx, 0); g.scale(facing, 1);
+      g.save(); g.translate(cx, 0);
       for (let i = n - 1; i >= 0; i--) {
         const x = hx - (i + 1) * gap, k = Math.max(0, Math.sin(t * 2.4 - i * 0.55));
         const y = base - R - k * k * R * 0.55;
