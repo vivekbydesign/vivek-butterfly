@@ -53,18 +53,19 @@
   <label>QR code<kbd>Q</kbd><input type="checkbox" id="optQr"></label>
   <button class="menu-action" id="loadArt" style="color:#f7eaf2;border-radius:0">Load garden art…<kbd>local folder</kbd></button>
   <input type="file" id="artDir" webkitdirectory multiple hidden>
+  <button class="menu-action" id="saveAll" style="color:#f7eaf2;border-radius:0">Save all butterflies…<kbd>PNG + name</kbd></button>
   <button class="menu-action" id="clearAll">Clear butterflies<kbd>R</kbd></button>
 </div>
 <div class="hint" id="hint">⋯ or M settings · F fullscreen · Q QR · A ambient butterflies · C webcam · T test arrival · V camera preview · R clear butterflies</div>
 <video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
 <script type="module">
-  import { BodyTracker } from './body.js?v=20261121c';
-  import { STATIC, qrSrc, listButterflies, clearButterflies, listen, uploadUrl } from './net.js?v=20261121c';
+  import { BodyTracker } from './body.js?v=20261121d';
+  import { STATIC, qrSrc, listButterflies, savedButterflies, clearButterflies, listen, uploadUrl } from './net.js?v=20261121d';
   qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
-  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121c';
+  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261121d';
   let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
   loadTextures().then((n) => { if (n) gardenKey = ''; });
-  import('./art.js?v=20261121c').then(({ importArt }) => {
+  import('./art.js?v=20261121d').then(({ importArt }) => {
     const dir = document.getElementById('artDir');
     document.getElementById('loadArt').onclick = () => dir.click();
     dir.onchange = async () => {
@@ -145,7 +146,7 @@
       try { addUploaded(await spriteFromUrl(item.url), item, false); } catch {}
     }
   });
-  listen(async (item) => { try { queue.push({ sprite: await spriteFromUrl(item.url), item }); } catch {} }, onReset);
+  listen(async (item) => { if (saveDir) saveToDir(item).catch((e) => console.warn('Auto-save failed', e)); try { queue.push({ sprite: await spriteFromUrl(item.url), item }); } catch {} }, onReset);
   function onReset() { flock.forEach((b) => !b.ambient && takeOff(b)); for (let i = flock.length - 1; i >= 0; i--) if (!flock[i].ambient) flock.splice(i, 1); }
 
   function addUploaded(sprite, item, entrance) {
@@ -219,6 +220,33 @@
   optQr.addEventListener('change', () => setQr(optQr.checked));
   function clearAll() { if (confirm('Remove all uploaded butterflies from the wall?')) clearButterflies().then(() => STATIC && onReset()); }
   document.getElementById('clearAll').addEventListener('click', clearAll);
+
+  // Save every uploaded butterfly as "Name – date time.png". In Chrome, the chosen folder also receives new arrivals automatically.
+  let saveDir = null;
+  const fileName = (x) => {
+    const t = new Date(x.created || Date.now()), p = (n) => String(n).padStart(2, '0');
+    const who = (x.name || 'Butterfly').replace(/[\\/:*?"<>|]+/g, '').trim() || 'Butterfly';
+    return `${who} – ${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}.${p(t.getMinutes())}.${p(t.getSeconds())}.png`;
+  };
+  const pngBlob = (x) => fetch(x.image || x.url).then((r) => r.blob());
+  async function saveToDir(x) {
+    const name = fileName(x);
+    try { await saveDir.getFileHandle(name); return false; } catch {}
+    const w = await (await saveDir.getFileHandle(name, { create: true })).createWritable();
+    await w.write(await pngBlob(x)); await w.close(); return true;
+  }
+  async function saveAll() {
+    const all = await savedButterflies();
+    if (!all.length) return alert('No butterflies uploaded yet.');
+    if (window.showDirectoryPicker) {
+      try { saveDir = await showDirectoryPicker({ id: 'rishis-garden-butterflies', mode: 'readwrite' }); } catch { return; }
+      let n = 0; for (const x of all) if (await saveToDir(x)) n++;
+      alert(`Saved ${n} new butterfl${n === 1 ? 'y' : 'ies'} (${all.length} total). New arrivals will save to this folder too while the wall is open.`);
+    } else {
+      for (const x of all) { const a = document.createElement('a'); a.href = URL.createObjectURL(await pngBlob(x)); a.download = fileName(x); a.click(); await new Promise((r) => setTimeout(r, 250)); }
+    }
+  }
+  document.getElementById('saveAll').addEventListener('click', saveAll);
   let cursorTimer;
   addEventListener('pointermove', () => { document.body.classList.add('show-cursor'); clearTimeout(cursorTimer); cursorTimer = setTimeout(() => document.body.classList.remove('show-cursor'), 2500); });
   // Video pixel -> screen px (mirrored, object-fit: cover)

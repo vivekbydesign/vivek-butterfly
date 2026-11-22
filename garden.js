@@ -1,7 +1,7 @@
 // Eric Carle–style collage, generated in code: acrylic washes and dry-brush streaks on tissue,
 // cut into simple shapes with scissors and pasted flat on a white page.
-import { WING } from './shape.js?v=20261121c';
-import { artSrc } from './art.js?v=20261121c';
+import { WING } from './shape.js?v=20261121d';
+import { artSrc } from './art.js?v=20261121d';
 const TAU = Math.PI * 2;
 let seed = 11;
 const R = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };

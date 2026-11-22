@@ -1,5 +1,5 @@
-import { SHEET, ART, WING, fillSilhouette, templateSvg } from './shape.js?v=20261121c';
-import { STATIC } from './net.js?v=20261121c';
+import { SHEET, ART, WING, fillSilhouette, templateSvg } from './shape.js?v=20261121d';
+import { STATIC } from './net.js?v=20261121d';
 
 const PX = 4; // output pixels per template unit
 
@@ -11,7 +11,7 @@ export async function extractButterfly(file) {
   try { return { ...(await fromTemplate(full)), mode: 'template' }; }
   catch (e) {
     console.warn('Template registration failed:', e.message);
-    throw new Error('Could not align the butterfly. Retake with all four black corner squares visible, the sheet flat, and good light.');
+    throw new Error('Could not find the butterfly sheet. Make sure all four black corner squares are in the photo, the page is flat, and try again.');
   }
 }
 
@@ -67,10 +67,10 @@ async function fromTemplate(full) {
   const pool = cands.slice(0, 16);
 
   // 2. Best four: convex, similar size, marker size consistent with frame size, exactly one ring preferred.
-  let best = null, bestScore = 0;
+  const quads = [];
   for (let a = 0; a < pool.length; a++) for (let b = a + 1; b < pool.length; b++) for (let c = b + 1; c < pool.length; c++) for (let d = c + 1; d < pool.length; d++) {
     const q = [pool[a], pool[b], pool[c], pool[d]];
-    const ns = q.map((m) => m.n); if (Math.max(...ns) / Math.min(...ns) > 8) continue;
+    const ns = q.map((m) => m.n); if (Math.max(...ns) / Math.min(...ns) > 3.5) continue;
     const gx = q.reduce((s, m) => s + m.x, 0) / 4, gy = q.reduce((s, m) => s + m.y, 0) / 4;
     q.sort((m1, m2) => Math.atan2(m1.y - gy, m1.x - gx) - Math.atan2(m2.y - gy, m2.x - gx));
     let area = 0, convex = true;
@@ -82,20 +82,29 @@ async function fromTemplate(full) {
     area /= 2;
     if (!convex || area <= 0) continue;
     const rel = Math.sqrt(ns.reduce((s, v) => s + v, 0) / 4) / Math.sqrt(area);
-    if (rel < 0.025 || rel > 0.16) continue;
+    if (rel < 0.042 || rel > 0.11) continue; // printed: 14-unit squares on a 224x190 frame = 0.068
     const rings = q.filter((m) => m.ring).length;
     const score = area * (rings === 1 ? 4 : 1);
-    if (score > bestScore) { bestScore = score; best = q; }
+    quads.push({ q, score });
   }
-  if (!best) throw new Error('corner squares not found');
+  if (!quads.length) throw new Error('corner squares not found');
+  quads.sort((a, b) => b.score - a.score);
+  const pts = await templatePoints();
+  const ridge = ridgeMap(lum, W, H);
+  // Try the most plausible square sets in turn; keep the first whose printed outline really is under the template.
+  let Hm = null, fit = null, lastErr = null;
+  for (const { q: best } of quads.slice(0, 12)) {
+    try { ({ Hm, fit } = alignQuad(best)); break; } catch (e) { lastErr = e; }
+  }
+  if (!Hm) throw lastErr;
+
+  function alignQuad(best) {
   let start = best.findIndex((m) => m.ring);
   if (best.filter((m) => m.ring).length !== 1) start = best.reduce((bi, m, i, arr) => (m.x + m.y < arr[bi].x + arr[bi].y ? i : bi), 0);
   const ordered = [0, 1, 2, 3].map((i) => best[(start + i) % 4]);
-  let Hm = homography(SHEET.markers, ordered.map((m) => [m.x, m.y]));
+  const Hm = homography(SHEET.markers, ordered.map((m) => [m.x, m.y]));
 
   // 3. Fine-align template lines to the drawn outline (paper curl, print scaling).
-  const pts = await templatePoints();
-  const ridge = ridgeMap(lum, W, H);
   const score = (dx, dy, s) => {
     let t = 0;
     for (let i = 0; i < pts.length; i += 2) {
@@ -126,6 +135,8 @@ async function fromTemplate(full) {
     return n / (pts.length / 2); };
   const onLine = lineHits(0, 0), off = (lineHits(7, 0) + lineHits(-7, 0) + lineHits(0, 7) + lineHits(0, -7)) / 4;
   if (onLine < 0.6 || onLine - off < 0.3) throw new Error(`outline mismatch (on ${onLine.toFixed(2)}, off ${off.toFixed(2)})`);
+  return { Hm, fit };
+  }
 
   // 4. Warp into template space at full resolution (2x2 supersampled).
   const k = full.width / W, src = pixels(full), SW = full.width, SH = full.height, sd = src.data;
@@ -666,3 +677,4 @@ function vivid(r, g, b) {
   const c = (v) => Math.max(0, Math.min(255, (v - 128) * 1.08 + 128 + 6));
   return [c(r), c(g), c(b)];
 }
+

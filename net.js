@@ -22,15 +22,29 @@ export async function qrSrc() {
 
 let dbp;
 const db = () => (dbp ||= new Promise((res, rej) => {
-  const r = indexedDB.open('rishis-garden', 1);
-  r.onupgradeneeded = () => r.result.createObjectStore('b', { keyPath: 'id' });
+  const r = indexedDB.open('rishis-garden', 2);
+  r.onupgradeneeded = (e) => {
+    const d = r.result;
+    if (!d.objectStoreNames.contains('b')) d.createObjectStore('b', { keyPath: 'id' });
+    if (!d.objectStoreNames.contains('keep')) {
+      // Permanent archive of every upload; clearing the wall leaves it alone.
+      const keep = d.createObjectStore('keep', { keyPath: 'id' });
+      if (e.oldVersion >= 1) r.transaction.objectStore('b').getAll().onsuccess = (g) => g.target.result.forEach((x) => keep.put(x));
+    }
+  };
   r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
 }));
-const tx = async (mode, fn) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction('b', mode), req = fn(t.objectStore('b')); t.oncomplete = () => res(req?.result); t.onerror = () => rej(t.error); }); };
+const tx = async (mode, fn, store = 'b') => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction(store, mode), req = fn(t.objectStore(store)); t.oncomplete = () => res(req?.result); t.onerror = () => rej(t.error); }); };
 
 export async function listButterflies() {
   if (!STATIC) return (await fetch('./api/butterflies')).json();
   const all = (await tx('readonly', (s) => s.getAll())) || [];
+  return all.sort((a, b) => a.created - b.created).map((x) => ({ ...x, url: x.image }));
+}
+// Every butterfly ever uploaded (including ones cleared from the wall), oldest first.
+export async function savedButterflies() {
+  if (!STATIC) return listButterflies();
+  const all = (await tx('readonly', (s) => s.getAll(), 'keep')) || [];
   return all.sort((a, b) => a.created - b.created).map((x) => ({ ...x, url: x.image }));
 }
 export async function clearButterflies() {
@@ -53,7 +67,7 @@ export function listen(add, reset) {
       peer.on('connection', (conn) => conn.on('data', async (msg) => {
         if (!msg || typeof msg.image !== 'string' || !msg.image.startsWith('data:image/png;base64,') || msg.image.length > 12e6) return conn.send({ ok: false });
         const item = { id: crypto.randomUUID(), image: msg.image, name: String(msg.name || '').slice(0, 40), created: Date.now() };
-        try { await tx('readwrite', (s) => s.put(item)); } catch (e) { console.warn('Could not save butterfly', e); }
+        try { await tx('readwrite', (s) => s.put(item)); await tx('readwrite', (s) => s.put(item), 'keep'); } catch (e) { console.warn('Could not save butterfly', e); }
         add({ ...item, url: item.image });
         conn.send({ ok: true });
       }));
