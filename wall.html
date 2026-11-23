@@ -71,13 +71,13 @@
 <div class="hint" id="hint">⋯ or M settings · F fullscreen · Q QR · A ambient butterflies · C webcam · T test arrival · V camera preview · R clear butterflies</div>
 <video id="preview" muted playsinline style="position:fixed;left:16px;top:16px;width:200px;transform:scaleX(-1);border-radius:10px;opacity:.85;display:none"></video>
 <script type="module">
-  import { BodyTracker } from './body.js?v=20261122b';
-  import { STATIC, qrSrc, listButterflies, savedButterflies, gardenButterflies, removeButterfly, clearButterflies, listen, uploadUrl, wallId } from './net.js?v=20261122b';
+  import { BodyTracker } from './body.js?v=20261122c';
+  import { STATIC, qrSrc, listButterflies, savedButterflies, gardenButterflies, removeButterfly, clearButterflies, listen, uploadUrl, wallId } from './net.js?v=20261122c';
   qrSrc().then((s) => { document.getElementById("qrimg").src = s; });
-  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261122b';
+  import { makeGarden, drawGarden, collageButterfly, loadCaterpillar, loadTextures } from './garden.js?v=20261122c';
   let catArt = null; loadCaterpillar().then((a) => { catArt = a; gardenKey = ''; });
   loadTextures().then((n) => { if (n) gardenKey = ''; });
-  import('./art.js?v=20261122b').then(({ importArt }) => {
+  import('./art.js?v=20261122c').then(({ importArt }) => {
     const dir = document.getElementById('artDir');
     document.getElementById('loadArt').onclick = () => dir.click();
     dir.onchange = async () => {
@@ -153,7 +153,7 @@
   // Uploaded butterflies: existing ones join quietly, new ones get an entrance.
   const queue = [];
   let hero = null;
-  Promise.all([listButterflies(), savedButterflies(), gardenButterflies()]).then(async ([list, kept, shared]) => {
+  Promise.all([listButterflies(), savedButterflies(), gardenButterflies()].map((p) => p.catch((e) => (console.warn('Garden load', e), [])))).then(async ([list, kept, shared]) => {
     // Add the shared garden, skipping any this screen already has (same relay id or same second).
     const ids = new Set(kept.concat(list).map((x) => x.id)), secs = new Set(kept.concat(list).map((x) => Math.floor(x.created / 1000)));
     list = list.concat(shared.filter((x) => !ids.has(x.id) && !secs.has(Math.floor(x.created / 1000)))).sort((a, b) => a.created - b.created);
