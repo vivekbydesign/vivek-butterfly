@@ -42,6 +42,11 @@ export async function listButterflies() {
   const all = (await tx('readonly', (s) => s.getAll())) || [];
   return all.sort((a, b) => a.created - b.created).map((x) => ({ ...x, url: x.image }));
 }
+// Shared garden: every relay butterfly, archived into the site by a GitHub Action (garden/index.json).
+export async function gardenButterflies() {
+  if (!STATIC) return [];
+  try { return (await (await fetch('./garden/index.json?t=' + Date.now())).json()).map((x) => ({ ...x, url: './garden/' + x.file })); } catch { return []; }
+}
 // Every butterfly ever uploaded (including ones cleared from the wall), oldest first.
 export async function savedButterflies() {
   if (!STATIC) return listButterflies();
@@ -66,8 +71,8 @@ export function listen(add, reset) {
     es.addEventListener('reset', reset);
     return;
   }
-  const receive = async (image, name) => {
-    const item = { id: crypto.randomUUID(), image, name: String(name || '').slice(0, 40), created: Date.now() };
+  const receive = async (image, name, id, created) => {
+    const item = { id: id || crypto.randomUUID(), image, name: String(name || '').slice(0, 40), created: created || Date.now() };
     try { await tx('readwrite', (s) => s.put(item)); await tx('readwrite', (s) => s.put(item), 'keep'); } catch (e) { console.warn('Could not save butterfly', e); }
     add({ ...item, url: item.image });
   };
@@ -81,7 +86,7 @@ export function listen(add, reset) {
       seen.add(m.id);
       const blob = await (await fetch(a.url)).blob();
       const image = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
-      await receive(image, String(m.message || '').startsWith('n:') ? m.message.slice(2) : '');
+      await receive(image, String(m.message || '').startsWith('n:') ? m.message.slice(2) : '', m.id, m.time * 1000);
     } catch (err) { console.warn('Relay butterfly failed', err); }
   };
   import(PEERJS).then(({ Peer }) => {
